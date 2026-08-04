@@ -1,0 +1,10 @@
+{
+  "name": "Aquinos Frios",
+  "description": "PWA de Controle de Estoque com conversão de unidades inteligente, leitura de código de barras, controle de lotes e importação de XML para distribuidora de frios.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
