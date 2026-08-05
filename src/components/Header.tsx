@@ -14,13 +14,18 @@ import {
   User as UserIcon,
   LogOut,
   Users,
+  Building2,
+  ChevronDown,
 } from 'lucide-react';
-import { User } from '../types';
+import { User, Company } from '../types';
 import { SUPERADMIN_EMAIL } from '../services/storage';
 import logoImg from '../assets/images/aquino_frios_logo_1785856942770.jpg';
 
 interface HeaderProps {
   user: User;
+  activeCompany?: Company;
+  companies?: Company[];
+  onSelectCompany?: (companyId: string) => void;
   onOpenSupabaseModal: () => void;
   onOpenUserManagement?: () => void;
   onOpenProfileModal: () => void;
@@ -33,6 +38,9 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   user,
+  activeCompany,
+  companies = [],
+  onSelectCompany,
   onOpenSupabaseModal,
   onOpenUserManagement,
   onOpenProfileModal,
@@ -45,6 +53,8 @@ export const Header: React.FC<HeaderProps> = ({
   const isSuperadmin =
     user.email.toLowerCase() === SUPERADMIN_EMAIL || user.role === 'superadmin';
 
+  const companyDisplayName = activeCompany?.name || 'Aquino Frios';
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 py-3 transition-colors">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
@@ -56,24 +66,47 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <img
             src={logoImg}
-            alt="Aquino Frios"
+            alt={companyDisplayName}
             className="w-10 h-10 rounded-xl object-cover shadow-md shadow-blue-500/20 border border-blue-400/30 group-hover:scale-105 transition"
             referrerPolicy="no-referrer"
           />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white leading-none group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
-                Aquino Frios
+                {companyDisplayName}
               </h1>
               <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800">
                 PWA ESTOQUE
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Carnes • Frios • Queijos
+              Carnes • Frios • Laticínios
             </p>
           </div>
         </button>
+
+        {/* Company Selector for Superadmin */}
+        {isSuperadmin && companies.length > 0 && (
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 text-xs font-bold text-amber-900 dark:text-amber-200 shadow-sm">
+            <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="text-amber-700 dark:text-amber-400 font-semibold text-[11px] uppercase tracking-wider">
+              Empresa Ativa:
+            </span>
+            <select
+              value={activeCompany?.id || ''}
+              onChange={(e) => onSelectCompany?.(e.target.value)}
+              className="bg-transparent font-black text-slate-900 dark:text-white outline-none cursor-pointer hover:text-amber-600 dark:hover:text-amber-400 transition"
+              title="Alternar empresa em modo Superadmin"
+            >
+              {companies.map((c) => (
+                <option key={c.id} value={c.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium">
+                  {c.name} ({c.document})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-amber-500 pointer-events-none -ml-1" />
+          </div>
+        )}
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">

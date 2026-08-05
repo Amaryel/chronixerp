@@ -26,6 +26,9 @@ import {
   Ban,
   Database,
   Edit2,
+  Eye,
+  RefreshCw,
+  Filter,
 } from 'lucide-react';
 import { User, UserRole, Company } from '../types';
 import { storage, SUPERADMIN_EMAIL } from '../services/storage';
@@ -44,6 +47,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const [activeTab, setActiveTab] = useState<'users' | 'companies'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // New User Form State
@@ -278,6 +282,25 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     }
   };
 
+  const handleSelectCompanyView = (companyId: string | null) => {
+    storage.setSuperadminSelectedCompanyId(companyId);
+    const selectedComp = companyId ? companies.find((c) => c.id === companyId) : null;
+    setFeedback({
+      type: 'success',
+      message: selectedComp
+        ? `Visão alternada para a empresa: ${selectedComp.name}. Agora você está gerenciando os dados deste cliente.`
+        : 'Visão restaurada para a empresa padrão.',
+    });
+    loadData();
+  };
+
+  const currentSelectedCompanyId = storage.getSuperadminSelectedCompanyId();
+  const activeCompany = storage.getCurrentUserCompany();
+  const pendingUsersCount = users.filter((u) => u.is_approved === false).length;
+
+  const filteredUsers =
+    companyFilter === 'all' ? users : users.filter((u) => u.company_id === companyFilter);
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -394,18 +417,50 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             {/* TAB 1: USERS MANAGEMENT */}
             {activeTab === 'users' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between gap-2">
+                {/* Pending Requests Alert Banner */}
+                {pendingUsersCount > 0 && (
+                  <div className="p-3.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-2xl flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>Há <strong>{pendingUsersCount} solicitação(ões) de cadastro pendente(s)</strong> aguardando sua liberação de acesso.</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Aqui você pode **liberar acessos**, promover usuários admin a **Superadmin**, e **vincular usuários à sua respectiva Empresa**.
+                    Aqui você pode **liberar acessos**, promover usuários a **Superadmin** e **vincular usuários às suas empresas**.
                   </p>
 
-                  <button
-                    onClick={() => setIsAddingUser(!isAddingUser)}
-                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95 shrink-0"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>{isAddingUser ? 'Cancelar' : 'Cadastrar Usuário'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* Company Filter Dropdown */}
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm">
+                      <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <select
+                        value={companyFilter}
+                        onChange={(e) => setCompanyFilter(e.target.value)}
+                        className="bg-transparent font-extrabold outline-none cursor-pointer"
+                      >
+                        <option value="all">Todas as Empresas ({users.length})</option>
+                        {companies.map((c) => {
+                          const count = users.filter((u) => u.company_id === c.id).length;
+                          return (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({count} usúarios)
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={() => setIsAddingUser(!isAddingUser)}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95 shrink-0"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{isAddingUser ? 'Cancelar' : 'Cadastrar Usuário'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Add New User Form */}
@@ -519,7 +574,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                        {users.map((u) => {
+                        {filteredUsers.map((u) => {
                           const isMainSuper = u.email.toLowerCase() === SUPERADMIN_EMAIL;
                           const userComp = companies.find((c) => c.id === u.company_id);
 
@@ -897,24 +952,38 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                           </p>
                         </div>
 
-                        <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
                           <button
-                            onClick={() => handleOpenEditCompany(c)}
-                            className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1"
+                            onClick={() => {
+                              handleSelectCompanyView(c.id);
+                              onClose();
+                            }}
+                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95"
+                            title={`Visualizar dados e operações da empresa ${c.name}`}
                           >
-                            <Edit2 className="w-3.5 h-3.5" /> Editar Dados
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Visualizar Esta Empresa</span>
                           </button>
 
-                          <button
-                            onClick={() => handleToggleCompanyStatus(c)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
-                              c.status === 'active'
-                                ? 'bg-rose-600 text-white hover:bg-rose-500'
-                                : 'bg-emerald-600 text-white hover:bg-emerald-500'
-                            }`}
-                          >
-                            {c.status === 'active' ? 'Suspender Empresa' : 'Liberar Empresa'}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleOpenEditCompany(c)}
+                              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" /> Editar
+                            </button>
+
+                            <button
+                              onClick={() => handleToggleCompanyStatus(c)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                                c.status === 'active'
+                                  ? 'bg-rose-600 text-white hover:bg-rose-500'
+                                  : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                              }`}
+                            >
+                              {c.status === 'active' ? 'Suspender' : 'Liberar'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

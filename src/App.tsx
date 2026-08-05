@@ -25,8 +25,9 @@ import { BulkPriceUpdate } from './components/BulkPriceUpdate';
 import { BulkStockAdjustment } from './components/BulkStockAdjustment';
 import { Reports } from './components/Reports';
 
-import { Product, Batch, Movement, Category, Supplier, User } from './types';
-import { storage } from './services/storage';
+import { Product, Batch, Movement, Category, Supplier, User, Company } from './types';
+import { storage, SUPERADMIN_EMAIL } from './services/storage';
+import { Building2 } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
@@ -40,6 +41,8 @@ export default function App() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [activeCompany, setActiveCompany] = useState<Company>(storage.getCurrentUserCompany());
   const [currentUser, setCurrentUser] = useState<User>(storage.getCurrentUser());
 
   // Modals state
@@ -51,7 +54,13 @@ export default function App() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
-  const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(false);
+  const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(() => {
+    const user = storage.getCurrentUser();
+    if (user && (user.email.toLowerCase() === SUPERADMIN_EMAIL || user.role === 'superadmin')) {
+      return true;
+    }
+    return false;
+  });
 
   // Sync state from storage
   const loadState = () => {
@@ -60,6 +69,8 @@ export default function App() {
     setSuppliers(storage.getSuppliers());
     setBatches(storage.getBatches());
     setMovements(storage.getMovements());
+    setCompanies(storage.getCompanies());
+    setActiveCompany(storage.getCurrentUserCompany());
     setCurrentUser(storage.getCurrentUser());
   };
 
@@ -132,16 +143,50 @@ export default function App() {
         onLoginSuccess={(user) => {
           setCurrentUser(user);
           loadState();
+          if (user.email.toLowerCase() === SUPERADMIN_EMAIL || user.role === 'superadmin') {
+            setIsUserManagementModalOpen(true);
+          }
         }}
       />
     );
   }
 
+  const isSuperadmin =
+    currentUser.email.toLowerCase() === SUPERADMIN_EMAIL || currentUser.role === 'superadmin';
+  const superadminCompanyOverride = storage.getSuperadminSelectedCompanyId();
+
   return (
     <div className={`min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors font-sans antialiased selection:bg-blue-500 selection:text-white pb-24 lg:pb-0`}>
+      {/* Superadmin Active Company Override Banner */}
+      {isSuperadmin && superadminCompanyOverride && (
+        <div className="bg-amber-400 dark:bg-amber-500 text-slate-950 font-black text-xs py-2 px-4 flex flex-wrap items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 shrink-0" />
+            <span>
+              Modo Superadmin Ativo: Você está visualizando os dados e operações da empresa <strong>{activeCompany?.name} ({activeCompany?.document})</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              storage.setSuperadminSelectedCompanyId(null);
+              loadState();
+            }}
+            className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[11px] font-bold hover:bg-slate-800 transition active:scale-95"
+          >
+            Voltar para Visão Padrão
+          </button>
+        </div>
+      )}
+
       {/* Top Header */}
       <Header
         user={currentUser}
+        activeCompany={activeCompany}
+        companies={companies}
+        onSelectCompany={(compId) => {
+          storage.setSuperadminSelectedCompanyId(compId);
+          loadState();
+        }}
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
         onOpenUserManagement={() => setIsUserManagementModalOpen(true)}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}

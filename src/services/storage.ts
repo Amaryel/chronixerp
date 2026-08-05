@@ -37,6 +37,7 @@ const STORAGE_KEYS = {
   USERS: 'aquinos_users',
   CURRENT_USER: 'aquinos_current_user',
   COMPANIES: 'aquinos_companies',
+  SUPERADMIN_SELECTED_COMPANY_ID: 'aquinos_superadmin_selected_company_id',
   PRODUCTS: 'aquinos_products',
   CATEGORIES: 'aquinos_categories',
   SUPPLIERS: 'aquinos_suppliers',
@@ -2082,9 +2083,32 @@ class StorageService {
     return updated;
   }
 
+  public getSuperadminSelectedCompanyId(): string | null {
+    return localStorage.getItem(STORAGE_KEYS.SUPERADMIN_SELECTED_COMPANY_ID);
+  }
+
+  public setSuperadminSelectedCompanyId(companyId: string | null): void {
+    if (!companyId) {
+      localStorage.removeItem(STORAGE_KEYS.SUPERADMIN_SELECTED_COMPANY_ID);
+    } else {
+      localStorage.setItem(STORAGE_KEYS.SUPERADMIN_SELECTED_COMPANY_ID, companyId);
+    }
+    this.notify();
+  }
+
   public getCurrentUserCompany(): Company {
     const currentUser = this.getCurrentUser();
     const companies = this.getCompanies();
+
+    // If Superadmin has manually selected a company view override
+    if (currentUser && (currentUser.email.toLowerCase() === SUPERADMIN_EMAIL || currentUser.role === 'superadmin')) {
+      const selectedId = this.getSuperadminSelectedCompanyId();
+      if (selectedId) {
+        const selectedComp = companies.find((c) => c.id === selectedId);
+        if (selectedComp) return selectedComp;
+      }
+    }
+
     if (currentUser && currentUser.company_id) {
       const found = companies.find((c) => c.id === currentUser.company_id);
       if (found) return found;
