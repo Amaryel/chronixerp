@@ -11,6 +11,9 @@ export interface Company {
   phone?: string;
   address?: string;
   email?: string;
+  logo_url?: string; // Custom company logo (base64 or image URL)
+  theme_color?: string; // Hex color code for company branding (e.g. #0284c7)
+  pwa_title?: string; // Custom title for PWA
   status: 'active' | 'blocked' | 'pending';
   supabase_url?: string;
   supabase_key?: string;

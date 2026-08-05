@@ -20,8 +20,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { User, UserRole } from '../types';
-import { storage, SUPERADMIN_EMAIL } from '../services/storage';
-import logoImg from '../assets/images/aquino_frios_logo_1785856942770.jpg';
+import { chronixLogoImg, storage, SUPERADMIN_EMAIL } from '../services/storage';
 
 interface LoginPageProps {
   onLoginSuccess: (user: User) => void;
@@ -31,6 +30,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
 
   const companies = storage.getCompanies();
+  const allUsers = storage.getUsers();
 
   // Form Fields with Saved Credentials Support
   const [email, setEmail] = useState(() => localStorage.getItem('aquinos_saved_email') || '');
@@ -39,7 +39,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<UserRole>('admin');
-  const [companyId, setCompanyId] = useState<string>(companies[0]?.id || 'comp-aquino');
+  const [companyId, setCompanyId] = useState<string>(companies[0]?.id || 'comp-chronix');
 
   // UI state
   const [showPassword, setShowPassword] = useState(false);
@@ -47,6 +47,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [successMessage, setSuccessMessage] = useState('');
 
   const isSuperadminAttempt = email.trim().toLowerCase() === SUPERADMIN_EMAIL;
+
+  // Identify company by email
+  const matchedUser = allUsers.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+  const identifiedCompany = matchedUser && matchedUser.company_id
+    ? companies.find((c) => c.id === matchedUser.company_id)
+    : companies.find((c) => c.email && c.email.toLowerCase() === email.trim().toLowerCase());
+
+  const activeLogo = identifiedCompany?.logo_url || chronixLogoImg;
+  const activeBrandName = identifiedCompany ? identifiedCompany.name : 'Chronix ERP';
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,19 +165,29 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden z-10 my-auto">
         {/* Header Branding */}
-        <div className="p-6 pb-4 text-center border-b border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-900/80">
-          <div className="inline-flex items-center justify-center p-1.5 rounded-2xl bg-slate-800/80 border border-slate-700/60 mb-3 shadow-lg">
+        <div className="p-6 pb-4 text-center border-b border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-900/80 relative">
+          <div className="inline-flex items-center justify-center p-2 rounded-2xl bg-slate-950/90 border border-slate-700/80 mb-3 shadow-xl relative group">
             <img
-              src={logoImg}
-              alt="Aquino Frios Logo"
-              className="w-14 h-14 rounded-xl object-cover shadow-md border border-blue-500/30"
+              src={activeLogo}
+              alt={`${activeBrandName} Logo`}
+              className="w-16 h-16 rounded-xl object-contain shadow-md border border-cyan-500/30 transition-transform group-hover:scale-105"
               referrerPolicy="no-referrer"
             />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Aquino Frios</h1>
-          <p className="text-xs text-slate-400 font-medium mt-1">
-            Sistema de Gestão de Estoque, Vendas & Fiados
+          <h1 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+            <span>{activeBrandName}</span>
+          </h1>
+          <p className="text-xs text-cyan-400/90 font-medium mt-1">
+            Gestão Inteligente • Resultados Reais
           </p>
+
+          {/* Dynamic Identified Company CNPJ Badge */}
+          {identifiedCompany && (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-cyan-950/60 border border-cyan-800/60 rounded-full text-[11px] font-semibold text-cyan-200">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
+              <span>CNPJ: {identifiedCompany.document}</span>
+            </div>
+          )}
         </div>
 
         {/* Mode Switcher Tabs */}

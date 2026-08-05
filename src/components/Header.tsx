@@ -18,8 +18,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { User, Company } from '../types';
-import { SUPERADMIN_EMAIL } from '../services/storage';
-import logoImg from '../assets/images/aquino_frios_logo_1785856942770.jpg';
+import { SUPERADMIN_EMAIL, chronixLogoImg } from '../services/storage';
 
 interface HeaderProps {
   user: User;
@@ -53,7 +52,8 @@ export const Header: React.FC<HeaderProps> = ({
   const isSuperadmin =
     user.email.toLowerCase() === SUPERADMIN_EMAIL || user.role === 'superadmin';
 
-  const companyDisplayName = activeCompany?.name || 'Aquino Frios';
+  const companyDisplayName = activeCompany?.name || 'Chronix ERP';
+  const companyLogo = activeCompany?.logo_url || chronixLogoImg;
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 py-3 transition-colors">
@@ -65,9 +65,9 @@ export const Header: React.FC<HeaderProps> = ({
           title="Clique para ir à Tela Inicial (Início)"
         >
           <img
-            src={logoImg}
+            src={companyLogo}
             alt={companyDisplayName}
-            className="w-10 h-10 rounded-xl object-cover shadow-md shadow-blue-500/20 border border-blue-400/30 group-hover:scale-105 transition"
+            className="w-10 h-10 rounded-xl object-contain shadow-md shadow-blue-500/20 border border-blue-400/30 group-hover:scale-105 transition bg-slate-950/80 p-0.5"
             referrerPolicy="no-referrer"
           />
           <div>
@@ -75,12 +75,18 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white leading-none group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
                 {companyDisplayName}
               </h1>
-              <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800">
-                PWA ESTOQUE
+              <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800 uppercase tracking-wider">
+                Chronix ERP
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Carnes • Frios • Laticínios
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
+              {activeCompany?.document ? (
+                <>
+                  <span className="font-mono font-semibold text-blue-600 dark:text-cyan-400">CNPJ: {activeCompany.document}</span>
+                </>
+              ) : (
+                <span>Gestão Inteligente • Resultados Reais</span>
+              )}
             </p>
           </div>
         </button>

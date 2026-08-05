@@ -4,6 +4,11 @@
  * and optionally syncs with Supabase database when configured.
  */
 
+import chronixLogoImg from '../assets/images/chronix_erp_logo_1785940876233.jpg';
+import aquinoLogoImg from '../assets/images/aquino_frios_logo_1785856942770.jpg';
+
+export { chronixLogoImg, aquinoLogoImg };
+
 import {
   Product,
   Category,
@@ -59,12 +64,40 @@ const STORAGE_KEYS = {
 // Default Companies (Multi-Empresas / White Label)
 const DEFAULT_COMPANIES: Company[] = [
   {
+    id: 'comp-chronix',
+    name: 'Chronix ERP - Matriz',
+    document: '00.000.000/0001-99',
+    phone: '(11) 4004-9000',
+    address: 'Av. Paulista, 1000 - São Paulo, SP',
+    email: 'contato@chronix.com.br',
+    logo_url: chronixLogoImg,
+    theme_color: '#0284c7',
+    pwa_title: 'Chronix ERP - Gestão Inteligente',
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+  {
     id: 'comp-aquino',
-    name: 'Aquino Frios',
+    name: 'Aquino Frios & Distribuidora',
     document: '30.404.812/0001-63',
     phone: '(88) 99999-0000',
-    address: 'Rua Principal, Centro',
+    address: 'Rua Principal, 500 - Juazeiro do Norte, CE',
     email: 'contato@aquinosfrios.com.br',
+    logo_url: aquinoLogoImg,
+    theme_color: '#2563eb',
+    pwa_title: 'Aquino Frios ERP',
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'comp-valesol',
+    name: 'Laticínios Vale do Sol',
+    document: '12.345.678/0001-90',
+    phone: '(85) 3333-4444',
+    address: 'Rodovia CE-060, Km 42 - Quixadá, CE',
+    email: 'financeiro@valedosol.com.br',
+    theme_color: '#16a34a',
+    pwa_title: 'Laticínios Vale do Sol ERP',
     status: 'active',
     created_at: new Date().toISOString(),
   },
@@ -286,7 +319,27 @@ class StorageService {
 
   // --- COMPANY & WHITE LABEL MANAGEMENT ---
   public getCompanies(): Company[] {
-    return this.getItem<Company[]>(STORAGE_KEYS.COMPANIES, DEFAULT_COMPANIES);
+    const list = this.getItem<Company[]>(STORAGE_KEYS.COMPANIES, DEFAULT_COMPANIES);
+    if (!list || list.length === 0) return DEFAULT_COMPANIES;
+
+    return list.map((comp) => {
+      let logo = comp.logo_url;
+      if (!logo) {
+        if (comp.id === 'comp-chronix' || comp.name.toLowerCase().includes('chronix')) {
+          logo = chronixLogoImg;
+        } else if (comp.id === 'comp-aquino' || comp.name.toLowerCase().includes('aquino')) {
+          logo = aquinoLogoImg;
+        } else {
+          logo = chronixLogoImg;
+        }
+      }
+      return {
+        ...comp,
+        logo_url: logo,
+        theme_color: comp.theme_color || '#0284c7',
+        pwa_title: comp.pwa_title || `${comp.name} ERP`,
+      };
+    });
   }
 
   public getCompanyById(id: string): Company | null {
@@ -317,10 +370,13 @@ class StorageService {
           ...data,
           name: data.name.trim(),
           document: cleanDoc,
+          logo_url: data.logo_url || companies[idx].logo_url || chronixLogoImg,
+          theme_color: data.theme_color || companies[idx].theme_color || '#0284c7',
+          pwa_title: data.pwa_title || companies[idx].pwa_title || `${data.name.trim()} ERP`,
         };
         companies[idx] = updatedCompany;
         this.setItem(STORAGE_KEYS.COMPANIES, companies);
-        this.addAuditLog('alteracao_lote', `Empresa atualizada: ${updatedCompany.name} (${updatedCompany.document})`);
+        this.addAuditLog('alteracao_lote', `Empresa atualizada: ${updatedCompany.name} (CNPJ: ${updatedCompany.document})`);
         return { success: true, company: updatedCompany };
       }
     }
@@ -337,6 +393,9 @@ class StorageService {
       phone: data.phone || '',
       address: data.address || '',
       email: data.email || '',
+      logo_url: data.logo_url || chronixLogoImg,
+      theme_color: data.theme_color || '#0284c7',
+      pwa_title: data.pwa_title || `${data.name.trim()} ERP`,
       status: data.status || 'active',
       supabase_url: data.supabase_url || '',
       supabase_key: data.supabase_key || '',

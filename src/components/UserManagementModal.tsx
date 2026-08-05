@@ -1,6 +1,12 @@
 /**
- * Aquinos Frios - User Management & Security Panel
- * Painel Exclusivo do Superadmin (amaryelcc@gmail.com) para Controle de Acessos, Bloqueio/Desbloqueio e Perfis.
+ * Chronix ERP - Superadmin & Multi-Tenant Management Panel
+ * Painel em Tela Cheia para Controle Total do Superadmin:
+ * - Gestão de Empresas por CNPJ
+ * - Upload de Logotipos customizados (PWA & Sistema)
+ * - Cores de Tema & Título PWA
+ * - Dashboards Globais & Métricas Multi-Empresas
+ * - Gestão de Usuários, Senhas e Acessos
+ * - Visualização/Alternância direta de Empresa Ativa
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,9 +15,6 @@ import {
   Users,
   Crown,
   Shield,
-  UserCheck,
-  UserX,
-  Lock,
   Trash2,
   Plus,
   AlertCircle,
@@ -24,27 +27,43 @@ import {
   KeyRound,
   Check,
   Ban,
-  Database,
   Edit2,
   Eye,
-  RefreshCw,
   Filter,
+  Upload,
+  Palette,
+  BarChart3,
+  TrendingUp,
+  Package,
+  DollarSign,
 } from 'lucide-react';
 import { User, UserRole, Company } from '../types';
-import { storage, SUPERADMIN_EMAIL } from '../services/storage';
+import { storage, SUPERADMIN_EMAIL, chronixLogoImg } from '../services/storage';
 
 interface UserManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: User;
+  onRefresh?: () => void;
 }
+
+const PRESET_THEME_COLORS = [
+  { name: 'Azul Chronix', hex: '#0284c7' },
+  { name: 'Azul Real', hex: '#2563eb' },
+  { name: 'Verde Esmeralda', hex: '#16a34a' },
+  { name: 'Roxo Imperial', hex: '#7c3aed' },
+  { name: 'Laranja Fogo', hex: '#ea580c' },
+  { name: 'Vermelho Ruby', hex: '#dc2626' },
+  { name: 'Ciano Neonis', hex: '#06b6d4' },
+];
 
 export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   isOpen,
   onClose,
   currentUser,
+  onRefresh,
 }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'companies'>('users');
+  const [activeTab, setActiveTab] = useState<'companies' | 'dashboards' | 'users'>('companies');
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyFilter, setCompanyFilter] = useState<string>('all');
@@ -66,6 +85,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const [companyPhone, setCompanyPhone] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
   const [companyEmail, setCompanyEmail] = useState('');
+  const [companyLogoUrl, setCompanyLogoUrl] = useState('');
+  const [companyThemeColor, setCompanyThemeColor] = useState('#0284c7');
+  const [companyPwaTitle, setCompanyPwaTitle] = useState('');
   const [companySupabaseUrl, setCompanySupabaseUrl] = useState('');
   const [companySupabaseKey, setCompanySupabaseKey] = useState('');
 
@@ -93,6 +115,24 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
   const isSuper = currentUser.email.toLowerCase() === SUPERADMIN_EMAIL || currentUser.role === 'superadmin';
 
+  // File Upload Helper (converts image file to Base64 data URL)
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setFeedback({ type: 'error', message: 'A imagem deve ser menor que 2MB.' });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (reader.result) {
+          setCompanyLogoUrl(reader.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // --- USER ACTIONS ---
   const handleToggleBlock = (targetUser: User) => {
     if (targetUser.email.toLowerCase() === SUPERADMIN_EMAIL) {
@@ -107,6 +147,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         message: `Status do usuário ${targetUser.name} alterado para: ${res.is_blocked ? 'BLOQUEADO' : 'ATIVO'}.`,
       });
       loadData();
+      onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao alterar bloqueio.' });
     }
@@ -125,6 +166,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         message: `Acesso do usuário ${targetUser.name} alterado para: ${res.is_approved ? 'LIBERADO' : 'PENDENTE'}.`,
       });
       loadData();
+      onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao alterar liberação de acesso.' });
     }
@@ -135,6 +177,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     if (res.success) {
       setFeedback({ type: 'success', message: 'Função do usuário atualizada com sucesso.' });
       loadData();
+      onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao atualizar função.' });
     }
@@ -145,6 +188,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     if (res.success) {
       setFeedback({ type: 'success', message: 'Usuário vinculado à empresa com sucesso.' });
       loadData();
+      onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao alterar empresa.' });
     }
@@ -164,6 +208,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     if (res.success) {
       setFeedback({ type: 'success', message: `Usuário ${targetUser.name} excluído do sistema.` });
       loadData();
+      onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao excluir usuário.' });
     }
@@ -191,6 +236,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       setNewUserEmail('');
       setNewUserPassword('');
       loadData();
+      onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao cadastrar usuário.' });
     }
@@ -208,6 +254,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       setResettingUserId(null);
       setResetPasswordValue('');
       loadData();
+      onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao alterar senha.' });
     }
@@ -221,6 +268,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     setCompanyPhone('');
     setCompanyAddress('');
     setCompanyEmail('');
+    setCompanyLogoUrl(chronixLogoImg);
+    setCompanyThemeColor('#0284c7');
+    setCompanyPwaTitle('');
     setCompanySupabaseUrl('');
     setCompanySupabaseKey('');
     setIsAddingCompany(true);
@@ -233,6 +283,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     setCompanyPhone(comp.phone || '');
     setCompanyAddress(comp.address || '');
     setCompanyEmail(comp.email || '');
+    setCompanyLogoUrl(comp.logo_url || chronixLogoImg);
+    setCompanyThemeColor(comp.theme_color || '#0284c7');
+    setCompanyPwaTitle(comp.pwa_title || `${comp.name} ERP`);
     setCompanySupabaseUrl(comp.supabase_url || '');
     setCompanySupabaseKey(comp.supabase_key || '');
     setIsAddingCompany(true);
@@ -241,7 +294,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const handleSaveCompany = (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim() || !companyDoc.trim()) {
-      setFeedback({ type: 'error', message: 'Informe a Razão Social/Nome e o CNPJ/CPF da empresa.' });
+      setFeedback({ type: 'error', message: 'Informe a Razão Social/Nome e o CNPJ da empresa.' });
       return;
     }
 
@@ -252,6 +305,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       phone: companyPhone,
       address: companyAddress,
       email: companyEmail,
+      logo_url: companyLogoUrl || chronixLogoImg,
+      theme_color: companyThemeColor,
+      pwa_title: companyPwaTitle || `${companyName.trim()} ERP`,
       supabase_url: companySupabaseUrl,
       supabase_key: companySupabaseKey,
     });
@@ -259,11 +315,12 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     if (res.success) {
       setFeedback({
         type: 'success',
-        message: editingCompany ? 'Dados da empresa atualizados com sucesso!' : 'Nova empresa cadastrada no sistema!',
+        message: editingCompany ? 'Empresa e logotipo atualizados com sucesso!' : 'Nova empresa cadastrada com logotipo!',
       });
       setIsAddingCompany(false);
       setEditingCompany(null);
       loadData();
+      onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao salvar empresa.' });
     }
@@ -277,6 +334,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         message: `Status da empresa ${comp.name} alterado para: ${res.status === 'active' ? 'ATIVA' : 'INATIVA'}.`,
       });
       loadData();
+      onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao alterar status da empresa.' });
     }
@@ -288,722 +346,818 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     setFeedback({
       type: 'success',
       message: selectedComp
-        ? `Visão alternada para a empresa: ${selectedComp.name}. Agora você está gerenciando os dados deste cliente.`
-        : 'Visão restaurada para a empresa padrão.',
+        ? `Visão alternada para a empresa: ${selectedComp.name} (CNPJ: ${selectedComp.document}).`
+        : 'Visão do sistema restaurada para a empresa padrão.',
     });
     loadData();
+    onRefresh?.();
   };
 
   const currentSelectedCompanyId = storage.getSuperadminSelectedCompanyId();
   const activeCompany = storage.getCurrentUserCompany();
-  const pendingUsersCount = users.filter((u) => u.is_approved === false).length;
 
   const filteredUsers =
     companyFilter === 'all' ? users : users.filter((u) => u.company_id === companyFilter);
 
+  // Global Multi-Company Metrics Calculation
+  const allProducts = storage.getProducts();
+  const totalStockValuation = allProducts.reduce((acc, p) => acc + (p.current_stock * (p.cost_price || p.sale_price || 0)), 0);
+  const activeCompaniesCount = companies.filter((c) => c.status === 'active').length;
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Modal Header */}
-        <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
-              <Crown className="w-6 h-6" />
+    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col w-screen h-screen overflow-hidden text-slate-100 font-sans select-none">
+      {/* FULLSCREEN TOP NAVBAR */}
+      <header className="px-6 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0 shadow-lg">
+        <div className="flex items-center gap-4">
+          <div className="p-2 bg-slate-950 rounded-2xl border border-cyan-500/40 shadow-inner">
+            <img
+              src={chronixLogoImg}
+              alt="Chronix ERP Logo"
+              className="w-9 h-9 rounded-xl object-contain"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-black text-white tracking-tight">
+                Painel Superadmin Chronix ERP
+              </h2>
+              <span className="px-2.5 py-0.5 text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full flex items-center gap-1 uppercase tracking-wider">
+                <Crown className="w-3 h-3 text-amber-400" />
+                Acesso Master
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-black text-slate-900 dark:text-white">
-                  Painel de Controle Superadmin & White Label
-                </h3>
-                <span className="px-2 py-0.5 text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 rounded-full border border-amber-300 dark:border-amber-800">
-                  SUPERADMIN
-                </span>
+            <p className="text-xs text-slate-400 font-medium">
+              Gestão de CNPJs, Logotipos PWA, Visualização de Empresas & Usuários
+            </p>
+          </div>
+        </div>
+
+        {/* Active Company Switcher Indicator in Top Right */}
+        <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3 px-3.5 py-1.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <img
+                src={activeCompany.logo_url || chronixLogoImg}
+                alt={activeCompany.name}
+                className="w-7 h-7 rounded-lg object-contain bg-slate-900 border border-cyan-500/30"
+                referrerPolicy="no-referrer"
+              />
+              <div className="text-left">
+                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Empresa em Visualização:</span>
+                <span className="block text-xs font-black text-cyan-300">{activeCompany.name}</span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Gerencie liberação de usuários, altere permissões de Superadmin e cadastre empresas parceiras.
-              </p>
             </div>
+
+            {currentSelectedCompanyId && (
+              <button
+                onClick={() => handleSelectCompanyView(null)}
+                className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-[10px] font-bold transition"
+                title="Restaurar para a empresa padrão"
+              >
+                Resetar Visão
+              </button>
+            )}
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className="p-2.5 rounded-2xl bg-slate-800 hover:bg-rose-900/80 hover:text-white text-slate-300 transition border border-slate-700 flex items-center gap-1.5 font-bold text-xs"
+            title="Sair do Painel Superadmin"
           >
             <X className="w-5 h-5" />
+            <span className="hidden sm:inline">Fechar Painel</span>
+          </button>
+        </div>
+      </header>
+
+      {/* FULLSCREEN TABS HEADER */}
+      <div className="bg-slate-900/90 border-b border-slate-800 px-6 flex items-center justify-between shrink-0">
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setActiveTab('companies');
+              setFeedback(null);
+            }}
+            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition ${
+              activeTab === 'companies'
+                ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
+                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <Building2 className="w-4 h-4 text-cyan-400" />
+            <span>Empresas & Logotipos CNPJ ({companies.length})</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('dashboards');
+              setFeedback(null);
+            }}
+            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition ${
+              activeTab === 'dashboards'
+                ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
+                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-blue-400" />
+            <span>Dashboards & Analytics Globais</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('users');
+              setFeedback(null);
+            }}
+            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition ${
+              activeTab === 'users'
+                ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
+                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <Users className="w-4 h-4 text-emerald-400" />
+            <span>Gestão de Usuários & Acessos ({users.length})</span>
           </button>
         </div>
 
-        {/* Tab Switcher */}
-        {isSuper && (
-          <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 px-6 gap-2 pt-2">
-            <button
-              onClick={() => {
-                setActiveTab('users');
-                setFeedback(null);
-              }}
-              className={`py-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition ${
-                activeTab === 'users'
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 rounded-t-xl'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Gestão de Usuários & Acessos ({users.length})</span>
-            </button>
+        {activeTab === 'companies' && (
+          <button
+            onClick={handleOpenNewCompany}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-blue-600/30 transition active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Cadastrar Nova Empresa</span>
+          </button>
+        )}
+      </div>
 
+      {/* FULLSCREEN MAIN CONTENT BODY */}
+      <main className="flex-1 overflow-y-auto p-6 bg-slate-950 space-y-6">
+        {/* Feedback Messages */}
+        {feedback && (
+          <div
+            className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-lg ${
+              feedback.type === 'success'
+                ? 'bg-emerald-950/90 text-emerald-200 border border-emerald-700/80'
+                : 'bg-rose-950/90 text-rose-200 border border-rose-700/80'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {feedback.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+              )}
+              <span>{feedback.message}</span>
+            </div>
             <button
-              onClick={() => {
-                setActiveTab('companies');
-                setFeedback(null);
-              }}
-              className={`py-3 px-4 text-xs font-extrabold flex items-center gap-2 border-b-2 transition ${
-                activeTab === 'companies'
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 rounded-t-xl'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-              }`}
+              onClick={() => setFeedback(null)}
+              className="text-xs font-bold hover:underline opacity-80"
             >
-              <Building2 className="w-4 h-4" />
-              <span>Empresas & White Label ({companies.length})</span>
+              Fechar
             </button>
           </div>
         )}
 
-        {/* Access Denial if not Superadmin */}
-        {!isSuper ? (
-          <div className="p-8 text-center my-auto space-y-3">
-            <ShieldAlert className="w-12 h-12 text-rose-500 mx-auto" />
-            <h4 className="text-base font-bold text-slate-900 dark:text-white">
-              Acesso Restrito ao Superadmin Principal
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-              Apenas a conta principal <strong className="text-amber-500">{SUPERADMIN_EMAIL}</strong> possui
-              autorização para gerenciar permissões e empresas parceiras.
-            </p>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold"
-            >
-              Entendido
-            </button>
-          </div>
-        ) : (
-          <div className="p-5 overflow-y-auto space-y-5 flex-1">
-            {/* Feedback Banners */}
-            {feedback && (
-              <div
-                className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-sm ${
-                  feedback.type === 'success'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800'
-                    : 'bg-rose-50 dark:bg-rose-950/80 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {feedback.type === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-                  )}
-                  <span>{feedback.message}</span>
-                </div>
-                <button
-                  onClick={() => setFeedback(null)}
-                  className="text-xs font-bold hover:underline opacity-80"
-                >
-                  Fechar
-                </button>
-              </div>
-            )}
-
-            {/* TAB 1: USERS MANAGEMENT */}
-            {activeTab === 'users' && (
-              <div className="space-y-4">
-                {/* Pending Requests Alert Banner */}
-                {pendingUsersCount > 0 && (
-                  <div className="p-3.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-2xl flex items-center justify-between shadow-sm">
-                    <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
-                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span>Há <strong>{pendingUsersCount} solicitação(ões) de cadastro pendente(s)</strong> aguardando sua liberação de acesso.</span>
-                    </div>
+        {/* TAB 1: COMPANIES & LOGO CONFIGURATION */}
+        {activeTab === 'companies' && (
+          <div className="space-y-6">
+            {/* Modal / Inline Form for Add or Edit Company */}
+            {isAddingCompany && (
+              <div className="p-6 bg-slate-900 border border-cyan-500/30 rounded-3xl shadow-2xl space-y-5">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <Building2 className="w-6 h-6 text-cyan-400" />
+                    <h3 className="font-black text-base text-white">
+                      {editingCompany ? `Editar Empresa: ${editingCompany.name}` : 'Cadastrar Nova Empresa Parceira'}
+                    </h3>
                   </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Aqui você pode **liberar acessos**, promover usuários a **Superadmin** e **vincular usuários às suas empresas**.
-                  </p>
-
-                  <div className="flex items-center gap-2">
-                    {/* Company Filter Dropdown */}
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm">
-                      <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <select
-                        value={companyFilter}
-                        onChange={(e) => setCompanyFilter(e.target.value)}
-                        className="bg-transparent font-extrabold outline-none cursor-pointer"
-                      >
-                        <option value="all">Todas as Empresas ({users.length})</option>
-                        {companies.map((c) => {
-                          const count = users.filter((u) => u.company_id === c.id).length;
-                          return (
-                            <option key={c.id} value={c.id}>
-                              {c.name} ({count} usúarios)
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-
-                    <button
-                      onClick={() => setIsAddingUser(!isAddingUser)}
-                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95 shrink-0"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{isAddingUser ? 'Cancelar' : 'Cadastrar Usuário'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Add New User Form */}
-                {isAddingUser && (
-                  <form
-                    onSubmit={handleCreateUser}
-                    className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3"
-                  >
-                    <h4 className="font-extrabold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <UserCheck className="w-4 h-4 text-blue-500" />
-                      <span>Cadastrar Novo Usuário</span>
-                    </h4>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          Nome Completo
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={newUserName}
-                          onChange={(e) => setNewUserName(e.target.value)}
-                          placeholder="ex: Roberto Silva"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          E-mail de Acesso
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          value={newUserEmail}
-                          onChange={(e) => setNewUserEmail(e.target.value)}
-                          placeholder="ex: roberto@empresa.com.br"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          Senha Inicial
-                        </label>
-                        <input
-                          type="text"
-                          value={newUserPassword}
-                          onChange={(e) => setNewUserPassword(e.target.value)}
-                          placeholder="Senha padrão (ex: 123456)"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          Nível de Permissão
-                        </label>
-                        <select
-                          value={newUserRole}
-                          onChange={(e) => setNewUserRole(e.target.value as UserRole)}
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-semibold"
-                        >
-                          <option value="superadmin">Superadmin (Controle Total)</option>
-                          <option value="admin">Administrador (Empresa)</option>
-                          <option value="funcionario">Funcionário (Operação)</option>
-                        </select>
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          Empresa Vinculada
-                        </label>
-                        <select
-                          value={newUserCompanyId}
-                          onChange={(e) => setNewUserCompanyId(e.target.value)}
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-semibold"
-                        >
-                          {companies.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} ({c.document})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-1">
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition"
-                      >
-                        Salvar Usuário
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {/* Users Table */}
-                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold uppercase tracking-wider">
-                        <tr>
-                          <th className="py-3 px-4">Usuário</th>
-                          <th className="py-3 px-4">Empresa Vinculada</th>
-                          <th className="py-3 px-4">Função / Perfil</th>
-                          <th className="py-3 px-4">Liberação de Acesso</th>
-                          <th className="py-3 px-4 text-right">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                        {filteredUsers.map((u) => {
-                          const isMainSuper = u.email.toLowerCase() === SUPERADMIN_EMAIL;
-                          const userComp = companies.find((c) => c.id === u.company_id);
-
-                          return (
-                            <tr
-                              key={u.id}
-                              className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition ${
-                                u.is_blocked
-                                  ? 'bg-rose-50/50 dark:bg-rose-950/20'
-                                  : u.is_approved === false
-                                  ? 'bg-amber-50/50 dark:bg-amber-950/20'
-                                  : ''
-                              }`}
-                            >
-                              <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
-                                <div className="flex items-center gap-2.5">
-                                  <div
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs shrink-0 ${
-                                      isMainSuper || u.role === 'superadmin'
-                                        ? 'bg-amber-500 shadow-sm'
-                                        : u.role === 'admin'
-                                        ? 'bg-blue-600'
-                                        : 'bg-slate-600'
-                                    }`}
-                                  >
-                                    {isMainSuper || u.role === 'superadmin' ? (
-                                      <Crown className="w-4 h-4" />
-                                    ) : (
-                                      u.name.substring(0, 1).toUpperCase()
-                                    )}
-                                  </div>
-                                  <div>
-                                    <span className="block font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                                      {u.name}
-                                      {isMainSuper && (
-                                        <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-950 px-1.5 py-0.2 rounded">
-                                          SUPERADMIN
-                                        </span>
-                                      )}
-                                    </span>
-                                    <span className="text-[11px] text-slate-400 font-mono font-normal">
-                                      {u.email}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Reset Password Form Inline */}
-                                {resettingUserId === u.id && (
-                                  <div className="mt-2.5 p-2 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center gap-2">
-                                    <KeyRound className="w-3.5 h-3.5 text-slate-500" />
-                                    <input
-                                      type="text"
-                                      value={resetPasswordValue}
-                                      onChange={(e) => setResetPasswordValue(e.target.value)}
-                                      placeholder="Nova Senha"
-                                      className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs rounded font-mono"
-                                    />
-                                    <button
-                                      onClick={() => handleSaveResetPassword(u.id)}
-                                      className="px-2 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded"
-                                    >
-                                      Salvar
-                                    </button>
-                                    <button
-                                      onClick={() => setResettingUserId(null)}
-                                      className="px-2 py-1 bg-slate-400 text-white font-bold text-[10px] rounded"
-                                    >
-                                      Cancelar
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-
-                              {/* Empresa Vinculada */}
-                              <td className="py-3.5 px-4">
-                                {isMainSuper ? (
-                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                    {userComp?.name || 'Todas as Empresas'}
-                                  </span>
-                                ) : (
-                                  <select
-                                    value={u.company_id || companies[0]?.id || ''}
-                                    onChange={(e) => handleCompanyChange(u.id, e.target.value)}
-                                    className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[160px] truncate"
-                                  >
-                                    {companies.map((c) => (
-                                      <option key={c.id} value={c.id}>
-                                        {c.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-                              </td>
-
-                              {/* Role selection (Superadmin, Admin, Funcionario) */}
-                              <td className="py-3.5 px-4">
-                                {isMainSuper ? (
-                                  <span className="px-2 py-1 rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold text-[11px]">
-                                    Superadmin Principal
-                                  </span>
-                                ) : (
-                                  <select
-                                    value={u.role}
-                                    onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
-                                    className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200"
-                                  >
-                                    <option value="superadmin">Superadmin</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="funcionario">Funcionário</option>
-                                  </select>
-                                )}
-                              </td>
-
-                              {/* Status de Liberação (is_approved) */}
-                              <td className="py-3.5 px-4">
-                                {u.is_blocked ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-extrabold text-[10px]">
-                                    <UserX className="w-3 h-3" /> BLOQUEADO
-                                  </span>
-                                ) : u.is_approved === false ? (
-                                  <button
-                                    onClick={() => handleToggleApproval(u)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] shadow-sm transition active:scale-95 animate-bounce"
-                                    title="Clique para liberar acesso do usuário"
-                                  >
-                                    <Lock className="w-3.5 h-3.5" /> LIBERAR ACESSO
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleToggleApproval(u)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-300 font-extrabold text-[11px] border border-emerald-300 dark:border-emerald-800 transition"
-                                    title="Acesso liberado. Clique para suspender liberação."
-                                  >
-                                    <UserCheck className="w-3.5 h-3.5" /> LIBERADO
-                                  </button>
-                                )}
-                              </td>
-
-                              {/* Security Actions */}
-                              <td className="py-3.5 px-4 text-right">
-                                {!isMainSuper ? (
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    <button
-                                      onClick={() => handleToggleBlock(u)}
-                                      className={`px-2 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 transition ${
-                                        u.is_blocked
-                                          ? 'bg-emerald-600 text-white'
-                                          : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-rose-600 hover:text-white'
-                                      }`}
-                                      title={u.is_blocked ? 'Desbloquear' : 'Bloquear'}
-                                    >
-                                      {u.is_blocked ? 'Desbloquear' : 'Bloquear'}
-                                    </button>
-
-                                    <button
-                                      onClick={() => {
-                                        setResettingUserId(u.id);
-                                        setResetPasswordValue('');
-                                      }}
-                                      className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-lg"
-                                      title="Redefinir Senha"
-                                    >
-                                      <KeyRound className="w-3.5 h-3.5" />
-                                    </button>
-
-                                    <button
-                                      onClick={() => handleDeleteUser(u)}
-                                      className="p-1.5 bg-rose-100 dark:bg-rose-950/60 hover:bg-rose-200 text-rose-600 dark:text-rose-400 rounded-lg"
-                                      title="Excluir Usuário"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-[11px] font-bold text-amber-500 italic">
-                                    Protegido
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: COMPANIES MANAGEMENT (WHITE LABEL / MULTI-TENANT) */}
-            {activeTab === 'companies' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Cadastre e gerencie empresas contratantes do sistema White-Label. Cada empresa possui seu CNPJ e dados de contato para emissão de notas/comprovantes.
-                  </p>
-
                   <button
-                    onClick={handleOpenNewCompany}
-                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95 shrink-0"
+                    type="button"
+                    onClick={() => {
+                      setIsAddingCompany(false);
+                      setEditingCompany(null);
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-slate-800"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Cadastrar Nova Empresa</span>
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                {/* Company Add / Edit Form */}
-                {isAddingCompany && (
-                  <form
-                    onSubmit={handleSaveCompany}
-                    className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3"
-                  >
-                    <h4 className="font-extrabold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <Building2 className="w-4 h-4 text-blue-500" />
-                      <span>{editingCompany ? 'Editar Empresa' : 'Cadastrar Nova Empresa Partner'}</span>
-                    </h4>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          Razão Social / Nome Fantasia
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={companyName}
-                          onChange={(e) => setCompanyName(e.target.value)}
-                          placeholder="ex: Aquino Frios Distribuidora"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-medium"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          CNPJ ou CPF
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={companyDoc}
-                          onChange={(e) => setCompanyDoc(e.target.value)}
-                          placeholder="ex: 30.404.812/0001-63"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          Telefone de Contato (Impresso no Cupom)
-                        </label>
-                        <input
-                          type="text"
-                          value={companyPhone}
-                          onChange={(e) => setCompanyPhone(e.target.value)}
-                          placeholder="ex: (88) 99999-0000"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          Endereço Completo
-                        </label>
-                        <input
-                          type="text"
-                          value={companyAddress}
-                          onChange={(e) => setCompanyAddress(e.target.value)}
-                          placeholder="ex: Av. Comercial, 100 - Centro"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          E-mail Corporativo
-                        </label>
-                        <input
-                          type="email"
-                          value={companyEmail}
-                          onChange={(e) => setCompanyEmail(e.target.value)}
-                          placeholder="ex: contato@empresa.com.br"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                          Supabase REST URL (Opcional - Banco Próprio)
-                        </label>
-                        <input
-                          type="text"
-                          value={companySupabaseUrl}
-                          onChange={(e) => setCompanySupabaseUrl(e.target.value)}
-                          placeholder="https://xyz.supabase.co"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                        />
-                      </div>
+                <form onSubmit={handleSaveCompany} className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Razão Social / Nome Fantasia *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        placeholder="ex: Chronix Frios Ltda"
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none focus:border-cyan-500"
+                      />
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsAddingCompany(false);
-                          setEditingCompany(null);
-                        }}
-                        className="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition"
-                      >
-                        Salvar Empresa
-                      </button>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        CNPJ ou CPF *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={companyDoc}
+                        onChange={(e) => setCompanyDoc(e.target.value)}
+                        placeholder="ex: 00.000.000/0001-99"
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono font-bold outline-none focus:border-cyan-500"
+                      />
                     </div>
-                  </form>
-                )}
 
-                {/* Companies List */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {companies.map((c) => {
-                    const companyUsersCount = users.filter((u) => u.company_id === c.id).length;
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Telefone de Contato (Cupom)
+                      </label>
+                      <input
+                        type="text"
+                        value={companyPhone}
+                        onChange={(e) => setCompanyPhone(e.target.value)}
+                        placeholder="ex: (11) 4004-9000"
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-medium outline-none focus:border-cyan-500"
+                      />
+                    </div>
 
-                    return (
-                      <div
-                        key={c.id}
-                        className={`p-4 rounded-2xl border transition ${
-                          c.status === 'blocked'
-                            ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900'
-                            : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <Building2 className="w-4 h-4 text-blue-500" />
-                              <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                                {c.name}
-                              </h4>
-                            </div>
-                            <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 block mt-0.5">
-                              CNPJ/CPF: {c.document}
-                            </span>
-                          </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Endereço Completo
+                      </label>
+                      <input
+                        type="text"
+                        value={companyAddress}
+                        onChange={(e) => setCompanyAddress(e.target.value)}
+                        placeholder="ex: Av. Paulista, 1000 - São Paulo, SP"
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-medium outline-none focus:border-cyan-500"
+                      />
+                    </div>
 
-                          <span
-                            className={`px-2.5 py-0.5 text-[10px] font-black rounded-full border ${
-                              c.status === 'active'
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-                                : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            {c.status === 'active' ? 'LIBERADA / ATIVA' : 'INATIVA / SUSPENSA'}
-                          </span>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        E-mail Corporativo de Acesso
+                      </label>
+                      <input
+                        type="email"
+                        value={companyEmail}
+                        onChange={(e) => setCompanyEmail(e.target.value)}
+                        placeholder="ex: contato@empresa.com.br"
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-medium outline-none focus:border-cyan-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Título Personalizado do PWA
+                      </label>
+                      <input
+                        type="text"
+                        value={companyPwaTitle}
+                        onChange={(e) => setCompanyPwaTitle(e.target.value)}
+                        placeholder="ex: Chronix ERP - Frios"
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-medium outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* CUSTOM LOGO & BRAND COLOR SECTION */}
+                  <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Logo Upload */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-cyan-400" />
+                        <label className="text-xs font-extrabold text-white uppercase tracking-wider">
+                          Logotipo da Empresa (Sistema e PWA)
+                        </label>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="w-20 h-20 bg-slate-900 rounded-2xl border-2 border-cyan-500/40 flex items-center justify-center p-1.5 shrink-0 shadow-lg relative group">
+                          <img
+                            src={companyLogoUrl || chronixLogoImg}
+                            alt="Preview Logo"
+                            className="w-full h-full object-contain rounded-xl"
+                            referrerPolicy="no-referrer"
+                          />
                         </div>
 
-                        <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60">
-                          {c.phone && (
-                            <p className="flex items-center gap-2">
-                              <Phone className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{c.phone}</span>
-                            </p>
-                          )}
-                          {c.address && (
-                            <p className="flex items-center gap-2">
-                              <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{c.address}</span>
-                            </p>
-                          )}
-                          <p className="flex items-center gap-2 text-slate-500">
-                            <Users className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{companyUsersCount} Usuário(s) vinculado(s)</span>
+                        <div className="space-y-2 flex-1">
+                          <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-extrabold transition shadow-md">
+                            <Upload className="w-4 h-4" />
+                            <span>Enviar Imagem (PNG/JPG)</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleLogoFileUpload}
+                              className="hidden"
+                            />
+                          </label>
+                          <p className="text-[11px] text-slate-400 font-medium">
+                            A logo será exibida na tela de login ao identificar o e-mail/CNPJ, no topo do sistema e no ícone do PWA.
                           </p>
                         </div>
-
-                        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
-                          <button
-                            onClick={() => {
-                              handleSelectCompanyView(c.id);
-                              onClose();
-                            }}
-                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95"
-                            title={`Visualizar dados e operações da empresa ${c.name}`}
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Visualizar Esta Empresa</span>
-                          </button>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleOpenEditCompany(c)}
-                              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" /> Editar
-                            </button>
-
-                            <button
-                              onClick={() => handleToggleCompanyStatus(c)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
-                                c.status === 'active'
-                                  ? 'bg-rose-600 text-white hover:bg-rose-500'
-                                  : 'bg-emerald-600 text-white hover:bg-emerald-500'
-                              }`}
-                            >
-                              {c.status === 'active' ? 'Suspender' : 'Liberar'}
-                            </button>
-                          </div>
-                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+
+                    {/* Theme Color Picker */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Palette className="w-4 h-4 text-blue-400" />
+                        <label className="text-xs font-extrabold text-white uppercase tracking-wider">
+                          Cor Primária da Empresa
+                        </label>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {PRESET_THEME_COLORS.map((preset) => (
+                          <button
+                            key={preset.hex}
+                            type="button"
+                            onClick={() => setCompanyThemeColor(preset.hex)}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center transition border-2 ${
+                              companyThemeColor === preset.hex
+                                ? 'border-white scale-110 shadow-lg'
+                                : 'border-transparent opacity-80 hover:opacity-100'
+                            }`}
+                            style={{ backgroundColor: preset.hex }}
+                            title={preset.name}
+                          >
+                            {companyThemeColor === preset.hex && <Check className="w-4 h-4 text-white" />}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-xs text-slate-400 font-bold">Hex:</span>
+                        <input
+                          type="text"
+                          value={companyThemeColor}
+                          onChange={(e) => setCompanyThemeColor(e.target.value)}
+                          className="px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono font-bold text-cyan-300 w-28"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingCompany(false);
+                        setEditingCompany(null);
+                      }}
+                      className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-700 transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition active:scale-95"
+                    >
+                      {editingCompany ? 'Salvar Alterações da Empresa' : 'Cadastrar Empresa com Logo'}
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
+
+            {/* Companies Grid List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {companies.map((c) => {
+                const companyUsersCount = users.filter((u) => u.company_id === c.id).length;
+                const isCurrentViewing = activeCompany.id === c.id;
+
+                return (
+                  <div
+                    key={c.id}
+                    className={`p-5 rounded-3xl border transition flex flex-col justify-between relative overflow-hidden shadow-xl ${
+                      isCurrentViewing
+                        ? 'bg-slate-900 border-cyan-500/80 ring-2 ring-cyan-500/30'
+                        : c.status === 'blocked'
+                        ? 'bg-rose-950/20 border-rose-900/60'
+                        : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    {/* Top Accent Line with Theme Color */}
+                    <div
+                      className="absolute top-0 left-0 right-0 h-1.5"
+                      style={{ backgroundColor: c.theme_color || '#0284c7' }}
+                    />
+
+                    <div>
+                      {/* Header Logo + Status */}
+                      <div className="flex items-start justify-between gap-3 mb-4 pt-1">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-slate-950 rounded-2xl border border-cyan-500/30 p-1 flex items-center justify-center shrink-0 shadow-md">
+                            <img
+                              src={c.logo_url || chronixLogoImg}
+                              alt={c.name}
+                              className="w-full h-full object-contain rounded-xl"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-base text-white leading-tight">
+                              {c.name}
+                            </h4>
+                            <span className="text-xs font-mono font-bold text-cyan-400 block mt-0.5">
+                              CNPJ: {c.document}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`px-2.5 py-0.5 text-[10px] font-black rounded-full border shrink-0 ${
+                            c.status === 'active'
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                              : 'bg-rose-950 text-rose-300 border-rose-800'
+                          }`}
+                        >
+                          {c.status === 'active' ? 'ATIVA' : 'SUSPENSA'}
+                        </span>
+                      </div>
+
+                      {/* Info details */}
+                      <div className="space-y-1.5 text-xs text-slate-300 pt-3 border-t border-slate-800">
+                        {c.email && (
+                          <p className="flex items-center gap-2">
+                            <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{c.email}</span>
+                          </p>
+                        )}
+                        {c.phone && (
+                          <p className="flex items-center gap-2">
+                            <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>{c.phone}</span>
+                          </p>
+                        )}
+                        {c.address && (
+                          <p className="flex items-center gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{c.address}</span>
+                          </p>
+                        )}
+                        <p className="flex items-center gap-2 text-slate-400 font-medium">
+                          <Users className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span>{companyUsersCount} Usuário(s) cadastrado(s)</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Actions bar */}
+                    <div className="mt-5 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        onClick={() => handleSelectCompanyView(c.id)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition ${
+                          isCurrentViewing
+                            ? 'bg-cyan-500 text-slate-950 shadow-lg font-black'
+                            : 'bg-slate-800 hover:bg-cyan-600 hover:text-white text-slate-200'
+                        }`}
+                        title="Alternar para visualizar o sistema como esta empresa"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>{isCurrentViewing ? 'Empresa Ativa Agora' : 'Visualizar Empresa'}</span>
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleOpenEditCompany(c)}
+                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1 transition"
+                          title="Editar CNPJ, Telefone ou Logotipo"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Editar</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleToggleCompanyStatus(c)}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
+                            c.status === 'active'
+                              ? 'bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800'
+                              : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-800'
+                          }`}
+                        >
+                          {c.status === 'active' ? 'Suspender' : 'Ativar'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-700 transition"
-          >
-            Fechar Painel
-          </button>
-        </div>
-      </div>
+        {/* TAB 2: GLOBAL MULTI-COMPANY DASHBOARDS */}
+        {activeTab === 'dashboards' && (
+          <div className="space-y-6">
+            {/* KPI Cards Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800 rounded-3xl shadow-xl flex items-center gap-4">
+                <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-2xl">
+                  <Building2 className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total de Empresas</span>
+                  <div className="text-2xl font-black text-white">{companies.length}</div>
+                  <span className="text-[11px] text-emerald-400 font-bold">{activeCompaniesCount} ativas no sistema</span>
+                </div>
+              </div>
+
+              <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800 rounded-3xl shadow-xl flex items-center gap-4">
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl">
+                  <Users className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total de Usuários</span>
+                  <div className="text-2xl font-black text-white">{users.length}</div>
+                  <span className="text-[11px] text-slate-400 font-medium">Contas registradas</span>
+                </div>
+              </div>
+
+              <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800 rounded-3xl shadow-xl flex items-center gap-4">
+                <div className="p-3 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-2xl">
+                  <Package className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Produtos de Estoque</span>
+                  <div className="text-2xl font-black text-white">{allProducts.length}</div>
+                  <span className="text-[11px] text-blue-400 font-bold">Catálogo geral</span>
+                </div>
+              </div>
+
+              <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800 rounded-3xl shadow-xl flex items-center gap-4">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl">
+                  <DollarSign className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Patrimônio do Estoque</span>
+                  <div className="text-xl font-black text-amber-300">
+                    R$ {totalStockValuation.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">Valor em mercadorias</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Companies Performance Table */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-cyan-400" />
+                <span>Resumo Operacional por Empresa Cadastrada</span>
+              </h3>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider font-extrabold border-b border-slate-800">
+                    <tr>
+                      <th className="p-3 rounded-l-xl">Empresa</th>
+                      <th className="p-3">CNPJ</th>
+                      <th className="p-3">Usuários</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3 text-right rounded-r-xl">Ação Direta</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                    {companies.map((c) => {
+                      const uCount = users.filter((u) => u.company_id === c.id).length;
+                      return (
+                        <tr key={c.id} className="hover:bg-slate-800/40 transition">
+                          <td className="p-3 font-bold text-white flex items-center gap-2.5">
+                            <img
+                              src={c.logo_url || chronixLogoImg}
+                              alt={c.name}
+                              className="w-7 h-7 rounded-lg object-contain bg-slate-950 border border-cyan-500/30 shrink-0"
+                              referrerPolicy="no-referrer"
+                            />
+                            <span>{c.name}</span>
+                          </td>
+                          <td className="p-3 font-mono text-cyan-300">{c.document}</td>
+                          <td className="p-3">{uCount} usuário(s)</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              c.status === 'active' ? 'bg-emerald-950 text-emerald-300' : 'bg-rose-950 text-rose-300'
+                            }`}>
+                              {c.status === 'active' ? 'ATIVA' : 'SUSPENSA'}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => handleSelectCompanyView(c.id)}
+                              className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-[11px] transition"
+                            >
+                              Visualizar Empresa
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: USER MANAGEMENT & ACCESS CONTROL */}
+        {activeTab === 'users' && (
+          <div className="space-y-6">
+            {/* Filter & Add User Row */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900 p-4 border border-slate-800 rounded-3xl">
+              <div className="flex items-center gap-3">
+                <Filter className="w-4 h-4 text-cyan-400" />
+                <span className="text-xs font-bold text-slate-300">Filtrar por Empresa:</span>
+                <select
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none"
+                >
+                  <option value="all">Todas as Empresas ({users.length})</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={() => setIsAddingUser(!isAddingUser)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Novo Usuário</span>
+              </button>
+            </div>
+
+            {/* Add User Form */}
+            {isAddingUser && (
+              <form onSubmit={handleCreateUser} className="p-5 bg-slate-900 border border-emerald-500/30 rounded-3xl space-y-4">
+                <h4 className="text-xs font-black text-emerald-400 uppercase tracking-wider">
+                  Cadastrar Novo Usuário no Sistema
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nome Completo *"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    className="px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none"
+                  />
+                  <input
+                    type="email"
+                    required
+                    placeholder="E-mail *"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    className="px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Senha *"
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    className="px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none"
+                  />
+                  <select
+                    value={newUserCompanyId}
+                    onChange={(e) => setNewUserCompanyId(e.target.value)}
+                    className="px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none"
+                  >
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingUser(false)}
+                    className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md"
+                  >
+                    Salvar Usuário
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Users Table */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider font-extrabold border-b border-slate-800">
+                    <tr>
+                      <th className="p-3.5">Usuário</th>
+                      <th className="p-3.5">E-mail</th>
+                      <th className="p-3.5">Empresa</th>
+                      <th className="p-3.5">Perfil</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                    {filteredUsers.map((u) => {
+                      const isMainSuper = u.email.toLowerCase() === SUPERADMIN_EMAIL;
+
+                      return (
+                        <tr key={u.id} className="hover:bg-slate-800/40 transition">
+                          <td className="p-3.5 font-bold text-white flex items-center gap-2">
+                            {isMainSuper && <Crown className="w-4 h-4 text-amber-400 shrink-0" />}
+                            <span>{u.name}</span>
+                          </td>
+                          <td className="p-3.5 font-mono text-cyan-300">{u.email}</td>
+                          <td className="p-3.5">
+                            <select
+                              value={u.company_id || ''}
+                              onChange={(e) => handleCompanyChange(u.id, e.target.value)}
+                              disabled={isMainSuper}
+                              className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 outline-none cursor-pointer"
+                            >
+                              {companies.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="p-3.5">
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
+                              disabled={isMainSuper}
+                              className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-amber-300 outline-none cursor-pointer"
+                            >
+                              <option value="superadmin">Superadmin</option>
+                              <option value="admin">Administrador</option>
+                              <option value="funcionario">Funcionário</option>
+                            </select>
+                          </td>
+                          <td className="p-3.5">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              u.is_blocked
+                                ? 'bg-rose-950 text-rose-300'
+                                : u.is_approved
+                                ? 'bg-emerald-950 text-emerald-300'
+                                : 'bg-amber-950 text-amber-300'
+                            }`}>
+                              {u.is_blocked ? 'BLOQUEADO' : u.is_approved ? 'LIBERADO' : 'PENDENTE'}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-right space-x-1.5">
+                            {!isMainSuper && (
+                              <>
+                                <button
+                                  onClick={() => handleToggleApproval(u)}
+                                  className="px-2.5 py-1 bg-blue-950 hover:bg-blue-900 text-blue-200 rounded-lg text-[11px] font-bold"
+                                >
+                                  {u.is_approved ? 'Pendente' : 'Liberar'}
+                                </button>
+                                <button
+                                  onClick={() => handleToggleBlock(u)}
+                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                                    u.is_blocked
+                                      ? 'bg-emerald-950 text-emerald-200'
+                                      : 'bg-rose-950 text-rose-200'
+                                  }`}
+                                >
+                                  {u.is_blocked ? 'Desbloquear' : 'Bloquear'}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(u)}
+                                  className="p-1.5 text-rose-400 hover:text-rose-200 rounded-lg"
+                                  title="Excluir Usuário"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 };

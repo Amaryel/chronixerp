@@ -366,6 +366,7 @@ export default function App() {
         isOpen={isUserManagementModalOpen}
         onClose={() => setIsUserManagementModalOpen(false)}
         currentUser={currentUser}
+        onRefresh={loadState}
       />
     </div>
   );
