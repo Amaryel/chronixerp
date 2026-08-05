@@ -43,7 +43,12 @@ export default function App() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeCompany, setActiveCompany] = useState<Company>(storage.getCurrentUserCompany());
-  const [currentUser, setCurrentUser] = useState<User>(storage.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (localStorage.getItem('aquinos_remember_me') !== 'true') {
+      localStorage.removeItem('aquinos_current_user');
+    }
+    return storage.getCurrentUser();
+  });
 
   // Modals state
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);

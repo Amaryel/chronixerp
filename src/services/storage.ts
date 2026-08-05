@@ -397,9 +397,8 @@ class StorageService {
     }
   }
 
-  public getCurrentUser(): User {
-    const active = this.getActiveSession();
-    return active || DEFAULT_USERS[0];
+  public getCurrentUser(): User | null {
+    return this.getActiveSession();
   }
 
   public setCurrentUser(user: User): void {
@@ -692,9 +691,9 @@ class StorageService {
     const log: AuditLog = {
       id: 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
       date: new Date().toISOString(),
-      user_id: user.id,
-      user_name: user.name,
-      user_role: user.role,
+      user_id: user?.id || 'sys-anon',
+      user_name: user?.name || 'Sistema',
+      user_role: user?.role || 'admin',
       action,
       details,
       target_id,

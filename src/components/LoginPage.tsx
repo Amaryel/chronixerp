@@ -16,7 +16,7 @@ import {
   AlertCircle,
   Crown,
   CheckCircle2,
-  Sparkles,
+  KeyRound,
   ArrowRight,
 } from 'lucide-react';
 import { User, UserRole } from '../types';
@@ -32,9 +32,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   const companies = storage.getCompanies();
 
-  // Form Fields
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Form Fields with Saved Credentials Support
+  const [email, setEmail] = useState(() => localStorage.getItem('aquinos_saved_email') || '');
+  const [password, setPassword] = useState(() => localStorage.getItem('aquinos_saved_password') || '');
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('aquinos_remember_me') === 'true');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<UserRole>('admin');
@@ -61,6 +62,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     if (!result.success || !result.user) {
       setErrorMessage(result.error || 'Erro ao realizar login.');
       return;
+    }
+
+    // Handle Remember Me / Saved Credentials
+    if (rememberMe) {
+      localStorage.setItem('aquinos_remember_me', 'true');
+      localStorage.setItem('aquinos_saved_email', email.trim());
+      localStorage.setItem('aquinos_saved_password', password);
+    } else {
+      localStorage.removeItem('aquinos_remember_me');
+      localStorage.removeItem('aquinos_saved_email');
+      localStorage.removeItem('aquinos_saved_password');
     }
 
     setSuccessMessage(`Bem-vindo de volta, ${result.user.name}!`);
@@ -229,15 +241,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
           {/* LOGIN FORM */}
           {mode === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form action="#" method="POST" onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                <label htmlFor="login-email" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                   E-mail de Acesso
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                   <input
+                    id="login-email"
+                    name="username"
                     type="email"
+                    autoComplete="username"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -248,13 +263,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                <label htmlFor="login-password" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                   Senha
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                   <input
+                    id="login-password"
+                    name="password"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -265,10 +283,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 p-1"
+                    title={showPassword ? 'Ocultar senha' : 'Exibir senha'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+              </div>
+
+              {/* Remember Me Checkbox & Password Save Option */}
+              <div className="flex items-center justify-between py-1">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300 hover:text-white transition select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded bg-slate-950 border-slate-700 text-blue-600 focus:ring-blue-500/30 accent-blue-600 cursor-pointer"
+                  />
+                  <span>Lembrar e-mail e manter conectado</span>
+                </label>
+              </div>
+
+              {/* Browser Password Saving Tip */}
+              <div className="p-3 bg-blue-950/40 border border-blue-800/50 rounded-2xl flex items-center gap-2 text-[11px] text-blue-200">
+                <KeyRound className="w-4 h-4 text-blue-400 shrink-0" />
+                <span>
+                  Ao clicar em <strong>Entrar</strong>, o seu navegador exibirá a janela nativa para <strong>salvar sua senha</strong>.
+                </span>
               </div>
 
               <button
@@ -281,15 +321,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </form>
           ) : (
             /* REGISTER FORM */
-            <form onSubmit={handleRegister} className="space-y-3.5">
+            <form action="#" method="POST" onSubmit={handleRegister} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                <label htmlFor="reg-name" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
                   Nome Completo
                 </label>
                 <div className="relative">
                   <UserIcon className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                   <input
+                    id="reg-name"
+                    name="name"
                     type="text"
+                    autoComplete="name"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -300,13 +343,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                <label htmlFor="reg-email" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
                   E-mail
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                   <input
+                    id="reg-email"
+                    name="username"
                     type="email"
+                    autoComplete="username"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -318,13 +364,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  <label htmlFor="reg-password" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
                     Senha
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                     <input
+                      id="reg-password"
+                      name="new-password"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -335,13 +384,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  <label htmlFor="reg-confirm-password" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
                     Confirmar Senha
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                     <input
+                      id="reg-confirm-password"
+                      name="confirm-password"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       required
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
