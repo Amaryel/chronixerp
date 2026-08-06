@@ -324,6 +324,23 @@ export const FullMovementPage: React.FC<FullMovementPageProps> = ({
     setPendingEntryItems([]);
   };
 
+  const handleDeleteMovement = (mov: Movement) => {
+    if (
+      window.confirm(
+        `Tem certeza que deseja excluir este lançamento de ${mov.product_name} (${mov.used_qty} ${mov.used_unit})? O estoque será revertido automaticamente.`
+      )
+    ) {
+      try {
+        storage.deleteMovement(mov.id);
+        setSuccessMessage('Lançamento excluído e estoque revertido com sucesso.');
+        setTimeout(() => setSuccessMessage(null), 3000);
+        onRefresh();
+      } catch (err: any) {
+        setErrorMessage(err.message || 'Erro ao excluir lançamento.');
+      }
+    }
+  };
+
   const handleFinalizeAll = () => {
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -511,7 +528,7 @@ export const FullMovementPage: React.FC<FullMovementPageProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                Página de {isEntry ? 'Entradas de Estoque' : 'Saídas de Estoque'}
+                {isEntry ? 'Página de Entrada de Estoque' : 'Página de Pré-Venda'}
               </h2>
               <span
                 className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
@@ -1080,12 +1097,21 @@ export const FullMovementPage: React.FC<FullMovementPageProps> = ({
 
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span>Por: {mov.user_name}</span>
-                    {mov.notes || mov.batch_number ? (
-                      <span className="text-[11px] truncate max-w-[180px]">
-                        {mov.batch_number ? `Lote: ${mov.batch_number} ` : ''}
-                        {mov.notes}
-                      </span>
-                    ) : null}
+                    <div className="flex items-center gap-2">
+                      {mov.notes || mov.batch_number ? (
+                        <span className="text-[11px] truncate max-w-[140px]">
+                          {mov.batch_number ? `Lote: ${mov.batch_number} ` : ''}
+                          {mov.notes}
+                        </span>
+                      ) : null}
+                      <button
+                        onClick={() => handleDeleteMovement(mov)}
+                        className="p-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition"
+                        title="Excluir e Reverter Estoque"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1102,6 +1128,7 @@ export const FullMovementPage: React.FC<FullMovementPageProps> = ({
                     <th className="py-3 px-3">Conversão Estoque</th>
                     <th className="py-3 px-3">Usuário</th>
                     <th className="py-3 px-3">Detalhes</th>
+                    <th className="py-3 px-3 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-semibold text-slate-700 dark:text-slate-300">
@@ -1139,6 +1166,15 @@ export const FullMovementPage: React.FC<FullMovementPageProps> = ({
                         ) : (
                           <span className="text-slate-400">-</span>
                         )}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          onClick={() => handleDeleteMovement(mov)}
+                          className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition"
+                          title="Excluir Lançamento e Reverter Estoque"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}

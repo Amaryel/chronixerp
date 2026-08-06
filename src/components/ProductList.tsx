@@ -587,19 +587,6 @@ export const ProductList: React.FC<ProductListProps> = ({
                     </div>
                   </div>
 
-                  {p.conversions && p.conversions.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {p.conversions.map((c, idx) => (
-                        <span
-                          key={c.id || `conv-mob-${c.from_unit}-${c.to_unit}-${idx}`}
-                          className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded text-[10px] font-bold"
-                        >
-                          1 {c.from_unit} = {c.factor} {c.to_unit}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
                   {/* Action buttons full-width touch friendly */}
                   <div className="flex items-center gap-2 pt-1 flex-wrap">
                     <button
@@ -664,7 +651,6 @@ export const ProductList: React.FC<ProductListProps> = ({
                   <th className="p-3.5">Preço Venda</th>
                   <th className="p-3.5">Saldo em Estoque</th>
                   <th className="p-3.5">Estoque Mín.</th>
-                  <th className="p-3.5">Regras de Conversão</th>
                   <th className="p-3.5 text-center">Status</th>
                   <th className="p-3.5 text-right pr-4">Ações Rápidas</th>
                 </tr>
@@ -723,23 +709,6 @@ export const ProductList: React.FC<ProductListProps> = ({
 
                       <td className="p-3.5 text-slate-600 dark:text-slate-300 font-bold">
                         {p.min_stock} {p.main_unit}
-                      </td>
-
-                      <td className="p-3.5">
-                        {p.conversions && p.conversions.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {p.conversions.map((c, idx) => (
-                              <span
-                                key={c.id || `conv-${c.from_unit}-${c.to_unit}-${idx}`}
-                                className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded text-[10px] font-bold"
-                              >
-                                1 {c.from_unit} = {c.factor} {c.to_unit}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-[11px]">-</span>
-                        )}
                       </td>
 
                       <td className="p-3.5 text-center">

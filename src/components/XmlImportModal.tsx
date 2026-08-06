@@ -3,7 +3,7 @@
  * Handles XML invoice file reading, smart product matching/linking, unit conversions, and 1-click test generator.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileCode2,
   UploadCloud,
@@ -18,7 +18,7 @@ import {
   Trash2,
   History,
 } from 'lucide-react';
-import { Product, XmlImportItem } from '../types';
+import { Product, XmlImportItem, XmlImport } from '../types';
 import { parseNFeXml, generateSampleNFeXml, ParsedNFe } from '../lib/xmlParser';
 import { storage } from '../services/storage';
 
@@ -41,8 +41,13 @@ export const XmlImportModal: React.FC<XmlImportModalProps> = ({
   const [parsedNFe, setParsedNFe] = useState<ParsedNFe | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [modalTab, setModalTab] = useState<'import' | 'history'>('import');
+  const [xmlImports, setXmlImports] = useState<XmlImport[]>(() => storage.getXmlImports());
 
-  const xmlImports = storage.getXmlImports();
+  useEffect(() => {
+    if (isOpen) {
+      setXmlImports(storage.getXmlImports());
+    }
+  }, [isOpen, modalTab]);
 
   const handleDeleteXmlImport = (importId: string, nfeNum: string) => {
     if (
@@ -52,6 +57,7 @@ export const XmlImportModal: React.FC<XmlImportModalProps> = ({
     ) {
       try {
         const res = storage.deleteXmlImportWithStockRollback(importId);
+        setXmlImports(storage.getXmlImports());
         alert(`Entrada XML excluída com sucesso! ${res.rolledBackItems} item(ns) tiveram seu estoque revertido.`);
         onSuccess();
       } catch (err: any) {
@@ -176,6 +182,19 @@ export const XmlImportModal: React.FC<XmlImportModalProps> = ({
     try {
       let importedItemsCount = 0;
 
+      // Save XML import record first to obtain ID
+      const newImport = storage.recordXmlImport({
+        xml_filename: `NFe_${parsedNFe.nfeNumber}.xml`,
+        import_date: new Date().toISOString(),
+        user_id: '',
+        user_name: '',
+        nfe_number: parsedNFe.nfeNumber,
+        supplier_cnpj: parsedNFe.supplierCnpj,
+        supplier_name: parsedNFe.supplierName,
+        total_value: parsedNFe.totalValue,
+        items_count: parsedNFe.items.length,
+      });
+
       parsedNFe.items.forEach((item, index) => {
         const mapping = itemMappings[index];
         if (!mapping) return;
@@ -247,24 +266,14 @@ export const XmlImportModal: React.FC<XmlImportModalProps> = ({
           expirationDate: item.dVal,
           origin: 'xml',
           notes: `Importação XML NFe #${parsedNFe.nfeNumber} (${item.qCom} ${item.uCom} -> ${item.qCom * factor} ${targetUnit})`,
+          xmlImportId: newImport.id,
+          nfeNumber: parsedNFe.nfeNumber,
         });
 
         importedItemsCount++;
       });
 
-      // Save XML import record
-      storage.recordXmlImport({
-        xml_filename: `NFe_${parsedNFe.nfeNumber}.xml`,
-        import_date: new Date().toISOString(),
-        user_id: '',
-        user_name: '',
-        nfe_number: parsedNFe.nfeNumber,
-        supplier_cnpj: parsedNFe.supplierCnpj,
-        supplier_name: parsedNFe.supplierName,
-        total_value: parsedNFe.totalValue,
-        items_count: importedItemsCount,
-      });
-
+      setXmlImports(storage.getXmlImports());
       onSuccess();
       onClose();
     } catch (err: any) {

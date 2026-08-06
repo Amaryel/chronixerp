@@ -110,21 +110,29 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     paperWidth,
   };
 
-  const handleSendWhatsapp = async () => {
+  const handleSendWhatsapp = () => {
     setIsSharing(true);
     try {
-      const result = await shareReceiptPDF(pdfData);
-      if (!result.sharedFile) {
-        // Fallback: download PDF file directly & inform user before opening WhatsApp
-        downloadReceiptPDF(pdfData);
-        alert('O comprovante PDF foi gerado e baixado! Anexe-o no WhatsApp que será aberto em seguida.');
-        window.open(result.whatsappUrl, '_blank');
-      }
+      // 1. Download PDF file directly
+      downloadReceiptPDF(pdfData);
+
+      // 2. Build WhatsApp formatted text message
+      const compName = pdfData.companyInfo?.name || companyName;
+      let text = `*${compName.toUpperCase()}*\n`;
+      text += `Comprovante de ${type === 'venda_normal' ? 'Venda' : type === 'venda_fiado' ? 'Venda Fiado' : type === 'pre_venda' ? 'Pré-Venda' : 'Recebimento/Quitação'}\n`;
+      if (pdfData.saleId) text += `Código: #${pdfData.saleId.slice(-6)}\n`;
+      if (pdfData.customerName) text += `Cliente: ${pdfData.customerName}\n`;
+      if (pdfData.totalAmount !== undefined) text += `*Total: R$ ${pdfData.totalAmount.toFixed(2)}*\n`;
+      if (pdfData.receivedAmount !== undefined) text += `Valor Recebido: R$ ${pdfData.receivedAmount.toFixed(2)}\n`;
+      text += `\n_O comprovante PDF foi gerado e baixado no seu dispositivo. Anexe-o nesta conversa._`;
+
+      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+      window.open(whatsappUrl, '_blank');
     } catch (e) {
       console.error(e);
-      downloadReceiptPDF(pdfData);
+      alert('Erro ao enviar comprovante pelo WhatsApp. O PDF foi gerado e baixado.');
     } finally {
-      setIsSharing(false);
+      setTimeout(() => setIsSharing(false), 500);
     }
   };
 

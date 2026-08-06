@@ -118,3 +118,72 @@ export function exportToPDF({ title, subtitle, columns, rows, fileName }: Export
 
   doc.save(`${fileName || title.toLowerCase().replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
+
+export function printReport({ title, subtitle, columns, rows }: ExportData) {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  const tableHeaders = columns
+    .map(
+      (c) =>
+        `<th style="padding: 10px 12px; border: 1px solid #cbd5e1; background-color: #1e3a8a; color: white; text-align: left; font-size: 11px; text-transform: uppercase;">${c.header}</th>`
+    )
+    .join('');
+
+  const tableRows = rows
+    .map(
+      (r, idx) =>
+        `<tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">` +
+        columns
+          .map(
+            (c) =>
+              `<td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-size: 11px; color: #1e293b;">${
+                r[c.key] ?? '-'
+              }</td>`
+          )
+          .join('') +
+        `</tr>`
+    )
+    .join('');
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <title>AQUINOS FRIOS - ${title}</title>
+        <style>
+          body { font-family: system-ui, -apple-system, sans-serif; margin: 24px; color: #0f172a; line-height: 1.4; }
+          .header { border-bottom: 2px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 16px; }
+          h1 { font-size: 20px; color: #1e3a8a; margin: 0 0 4px 0; font-weight: 800; }
+          h2 { font-size: 13px; color: #64748b; margin: 0; font-weight: 500; }
+          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+          .footer { margin-top: 24px; text-align: right; font-size: 10px; color: #94a3b8; }
+          @media print {
+            body { margin: 12px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>AQUINOS FRIOS - ${title}</h1>
+          <h2>${subtitle || ''} | Emissão: ${new Date().toLocaleString('pt-BR')}</h2>
+        </div>
+        <table>
+          <thead><tr>${tableHeaders}</tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        <div class="footer">Relatório gerado pelo sistema Aquinos Frios</div>
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}

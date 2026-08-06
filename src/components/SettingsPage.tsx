@@ -12,6 +12,7 @@ import {
   User,
   Sliders,
   CheckCircle2,
+  Users,
 } from 'lucide-react';
 import { Product, Batch, Movement, Category, User as UserType } from '../types';
 import { XmlImportModal } from './XmlImportModal';
@@ -21,6 +22,7 @@ import { Reports } from './Reports';
 import { AuditLogView } from './AuditLogView';
 import { UserProfileModal } from './UserProfileModal';
 import { SupabaseModal } from './SupabaseModal';
+import { UserManagementModal } from './UserManagementModal';
 import { OperationalPreferences } from './OperationalPreferences';
 import { storage } from '../services/storage';
 
@@ -42,12 +44,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onRefresh,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<
-    'preferences' | 'xml' | 'batches' | 'inventory' | 'reports' | 'audit' | 'profile' | 'supabase'
+    'preferences' | 'xml' | 'batches' | 'inventory' | 'reports' | 'audit' | 'profile' | 'supabase' | 'users'
   >('preferences');
 
   const [isXmlModalOpen, setIsXmlModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+  const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -68,6 +71,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-1.5 overflow-x-auto no-scrollbar">
         {[
           { id: 'preferences', label: 'Preferências Operacionais', icon: Sliders },
+          { id: 'users', label: 'Usuários & Operadores', icon: Users },
           { id: 'xml', label: 'Importar XML', icon: FileCode2 },
           { id: 'batches', label: 'Lotes e Validades', icon: Calendar },
           { id: 'inventory', label: 'Inventário de Estoque', icon: Sliders },
@@ -83,6 +87,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               key={sub.id}
               onClick={() => {
                 if (sub.id === 'xml') setIsXmlModalOpen(true);
+                else if (sub.id === 'users') setIsUserManagementModalOpen(true);
                 else if (sub.id === 'profile') setIsProfileModalOpen(true);
                 else if (sub.id === 'supabase') setIsSupabaseModalOpen(true);
                 else setActiveSubTab(sub.id as any);
@@ -154,6 +159,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         isOpen={isSupabaseModalOpen}
         currentUser={currentUser}
         onClose={() => setIsSupabaseModalOpen(false)}
+      />
+
+      <UserManagementModal
+        isOpen={isUserManagementModalOpen}
+        currentUser={currentUser}
+        onClose={() => setIsUserManagementModalOpen(false)}
+        onRefresh={onRefresh}
       />
     </div>
   );

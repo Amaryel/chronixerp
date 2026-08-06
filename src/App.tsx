@@ -24,6 +24,7 @@ import { FiadoManagement } from './components/FiadoManagement';
 import { BulkPriceUpdate } from './components/BulkPriceUpdate';
 import { BulkStockAdjustment } from './components/BulkStockAdjustment';
 import { Reports } from './components/Reports';
+import { CargaVendedor } from './components/CargaVendedor';
 
 import { Product, Batch, Movement, Category, Supplier, User, Company } from './types';
 import { storage, SUPERADMIN_EMAIL } from './services/storage';
@@ -59,13 +60,7 @@ export default function App() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
-  const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(() => {
-    const user = storage.getCurrentUser();
-    if (user && (user.email.toLowerCase() === SUPERADMIN_EMAIL || user.role === 'superadmin')) {
-      return true;
-    }
-    return false;
-  });
+  const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(false);
 
   // Sync state from storage
   const loadState = () => {
@@ -148,9 +143,6 @@ export default function App() {
         onLoginSuccess={(user) => {
           setCurrentUser(user);
           loadState();
-          if (user.email.toLowerCase() === SUPERADMIN_EMAIL || user.role === 'superadmin') {
-            setIsUserManagementModalOpen(true);
-          }
         }}
       />
     );
@@ -226,7 +218,6 @@ export default function App() {
             onOpenEntryModal={handleOpenEntry}
             onOpenExitModal={handleOpenExit}
             onOpenXmlModal={() => setIsXmlModalOpen(true)}
-            onOpenScanner={() => setIsScannerOpen(true)}
             onNavigateTab={handleSelectTab}
           />
         )}
@@ -291,6 +282,15 @@ export default function App() {
 
         {activeTab === 'bulk_stock' && (
           <BulkStockAdjustment products={products} onRefresh={loadState} />
+        )}
+
+        {activeTab === 'carga_vendedor' && (
+          <CargaVendedor
+            products={products}
+            movements={movements}
+            currentUser={currentUser}
+            onRefresh={loadState}
+          />
         )}
 
         {activeTab === 'customers' && (

@@ -1,6 +1,5 @@
 /**
- * Aquinos Frios - Login & Registration Component
- * Permite Login e Cadastro de Usuários (Email e Senha) com reconhecimento automático do Superadmin (amaryelcc@gmail.com).
+ * ChronixERP - Clean Login & Authentication Component
  */
 
 import React, { useState } from 'react';
@@ -8,16 +7,14 @@ import {
   Lock,
   Mail,
   User as UserIcon,
-  ShieldCheck,
   Eye,
   EyeOff,
   LogIn,
   UserPlus,
   AlertCircle,
-  Crown,
   CheckCircle2,
-  KeyRound,
   ArrowRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { chronixLogoImg, storage, SUPERADMIN_EMAIL } from '../services/storage';
@@ -30,9 +27,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
 
   const companies = storage.getCompanies();
-  const allUsers = storage.getUsers();
 
-  // Form Fields with Saved Credentials Support
+  // Form Fields
   const [email, setEmail] = useState(() => localStorage.getItem('aquinos_saved_email') || '');
   const [password, setPassword] = useState(() => localStorage.getItem('aquinos_saved_password') || '');
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('aquinos_remember_me') === 'true');
@@ -48,22 +44,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   const isSuperadminAttempt = email.trim().toLowerCase() === SUPERADMIN_EMAIL;
 
-  // Identify company by email
-  const matchedUser = allUsers.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-  const identifiedCompany = matchedUser && matchedUser.company_id
-    ? companies.find((c) => c.id === matchedUser.company_id)
-    : companies.find((c) => c.email && c.email.toLowerCase() === email.trim().toLowerCase());
-
-  const activeLogo = identifiedCompany?.logo_url || chronixLogoImg;
-  const activeBrandName = identifiedCompany ? identifiedCompany.name : 'Chronix ERP';
-
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
     if (!email.trim() || !password) {
-      setErrorMessage('Preencha o e-mail e a senha para continuar.');
+      setErrorMessage('Preencha o e-mail/usuário e a senha para continuar.');
       return;
     }
 
@@ -73,21 +60,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // Handle Remember Me / Saved Credentials
+    // Handle Remember Me / Session persistence
     if (rememberMe) {
       localStorage.setItem('aquinos_remember_me', 'true');
       localStorage.setItem('aquinos_saved_email', email.trim());
       localStorage.setItem('aquinos_saved_password', password);
+      sessionStorage.setItem('aquinos_session_active', 'true');
     } else {
       localStorage.removeItem('aquinos_remember_me');
       localStorage.removeItem('aquinos_saved_email');
       localStorage.removeItem('aquinos_saved_password');
+      sessionStorage.setItem('aquinos_session_active', 'true');
     }
 
     setSuccessMessage(`Bem-vindo de volta, ${result.user.name}!`);
     setTimeout(() => {
       onLoginSuccess(result.user!);
-    }, 400);
+    }, 300);
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -128,66 +117,47 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    setSuccessMessage(
-      isSuperadminAttempt
-        ? 'Conta Superadmin criada e ativada com sucesso!'
-        : 'Cadastro realizado com sucesso! Aguarde a liberação ou acesse o sistema.'
-    );
+    setSuccessMessage('Cadastro realizado com sucesso! Você já pode acessar sua conta.');
 
     setTimeout(() => {
-      if (result.user) {
-        // Log in user if login works
-        const logResult = storage.login(email, password);
-        if (logResult.success && logResult.user) {
-          onLoginSuccess(logResult.user);
+      const logResult = storage.login(email, password);
+      if (logResult.success && logResult.user) {
+        if (rememberMe) {
+          localStorage.setItem('aquinos_remember_me', 'true');
+          localStorage.setItem('aquinos_saved_email', email.trim());
+          localStorage.setItem('aquinos_saved_password', password);
         }
+        sessionStorage.setItem('aquinos_session_active', 'true');
+        onLoginSuccess(logResult.user);
+      } else {
+        setMode('login');
       }
     }, 500);
-  };
-
-  // Shortcut login helper for testing
-  const handleShortcutLogin = (shortcutEmail: string, shortcutPass = '123') => {
-    setEmail(shortcutEmail);
-    setPassword(shortcutPass);
-    const result = storage.login(shortcutEmail, shortcutPass);
-    if (result.success && result.user) {
-      onLoginSuccess(result.user);
-    } else if (result.error) {
-      setErrorMessage(result.error);
-    }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 relative overflow-hidden select-none">
       {/* Background Decorative Lighting */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden z-10 my-auto">
         {/* Header Branding */}
-        <div className="p-6 pb-4 text-center border-b border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-900/80 relative">
-          <div className="inline-flex items-center justify-center p-2 rounded-2xl bg-slate-950/90 border border-slate-700/80 mb-3 shadow-xl relative group">
+        <div className="p-6 pb-5 text-center border-b border-slate-800 bg-gradient-to-b from-slate-900 to-slate-900/90 relative">
+          <div className="inline-flex items-center justify-center p-2 rounded-2xl bg-slate-950 border border-slate-700/80 mb-3 shadow-xl">
             <img
-              src={activeLogo}
-              alt={`${activeBrandName} Logo`}
-              className="w-16 h-16 rounded-xl object-contain shadow-md border border-cyan-500/30 transition-transform group-hover:scale-105"
+              src={chronixLogoImg}
+              alt="Chronix ERP Logo"
+              className="w-16 h-16 rounded-xl object-contain shadow-md"
               referrerPolicy="no-referrer"
             />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
-            <span>{activeBrandName}</span>
+          <h1 className="text-2xl font-black text-white tracking-tight">
+            Chronix ERP
           </h1>
-          <p className="text-xs text-cyan-400/90 font-medium mt-1">
-            Gestão Inteligente • Resultados Reais
+          <p className="text-xs text-slate-400 font-medium mt-1">
+            Gestão Inteligente • Acesso Seguro
           </p>
-
-          {/* Dynamic Identified Company CNPJ Badge */}
-          {identifiedCompany && (
-            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-cyan-950/60 border border-cyan-800/60 rounded-full text-[11px] font-semibold text-cyan-200">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
-              <span>CNPJ: {identifiedCompany.document}</span>
-            </div>
-          )}
         </div>
 
         {/* Mode Switcher Tabs */}
@@ -227,7 +197,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           </button>
         </div>
 
-        {/* Error / Success Banners */}
+        {/* Form Body */}
         <div className="p-6 space-y-4">
           {errorMessage && (
             <div className="p-3.5 bg-rose-950/80 border border-rose-800/80 text-rose-200 text-xs font-semibold rounded-2xl flex items-start gap-2.5 shadow-md">
@@ -243,27 +213,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </div>
           )}
 
-          {/* Superadmin Notification Banner */}
-          {isSuperadminAttempt && (
-            <div className="p-3 bg-amber-950/60 border border-amber-700/60 text-amber-200 text-xs font-bold rounded-2xl flex items-center gap-2.5 animate-pulse">
-              <Crown className="w-4 h-4 text-amber-400 shrink-0" />
-              <div>
-                <span className="block font-black text-amber-300">
-                  Usuário Superadmin Reconhecido
-                </span>
-                <span className="text-[11px] font-normal text-amber-200/80">
-                  Acesso total a bloqueio de usuários e configuração do Supabase.
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* LOGIN FORM */}
           {mode === 'login' ? (
             <form action="#" method="POST" onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label htmlFor="login-email" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                  E-mail de Acesso
+                  E-mail ou Usuário
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
@@ -275,7 +230,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Seu e-mail (ex: amaryelcc@gmail.com)"
+                    placeholder="Seu e-mail de acesso"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-blue-500 font-medium transition"
                   />
                 </div>
@@ -309,7 +264,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
-              {/* Remember Me Checkbox & Password Save Option */}
+              {/* Lembrar-me Checkbox */}
               <div className="flex items-center justify-between py-1">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300 hover:text-white transition select-none">
                   <input
@@ -318,23 +273,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-4 h-4 rounded bg-slate-950 border-slate-700 text-blue-600 focus:ring-blue-500/30 accent-blue-600 cursor-pointer"
                   />
-                  <span>Lembrar e-mail e manter conectado</span>
+                  <span>Lembrar-me / Manter conectado</span>
                 </label>
-              </div>
-
-              {/* Browser Password Saving Tip */}
-              <div className="p-3 bg-blue-950/40 border border-blue-800/50 rounded-2xl flex items-center gap-2 text-[11px] text-blue-200">
-                <KeyRound className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>
-                  Ao clicar em <strong>Entrar</strong>, o seu navegador exibirá a janela nativa para <strong>salvar sua senha</strong>.
-                </span>
               </div>
 
               <button
                 type="submit"
                 className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-2 active:scale-98 mt-2"
               >
-                <span>Entrar no Sistema</span>
+                <span>Entrar</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -355,7 +302,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Seu nome"
+                    placeholder="Seu nome completo"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-blue-500 font-medium transition"
                   />
                 </div>
@@ -375,7 +322,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="ex: amaryelcc@gmail.com"
+                    placeholder="seu.email@empresa.com"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-blue-500 font-medium transition"
                   />
                 </div>
@@ -427,7 +374,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <>
                   <div>
                     <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      Empresas Disponíveis
+                      Empresa
                     </label>
                     <select
                       value={companyId}
@@ -444,7 +391,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      Perfil / Nível de Acesso
+                      Perfil Solicitado
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -482,7 +429,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2 active:scale-98 mt-3"
               >
                 <UserPlus className="w-4 h-4" />
-                <span>Solicitar Cadastro e Acessar</span>
+                <span>Cadastrar e Acessar</span>
               </button>
             </form>
           )}

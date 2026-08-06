@@ -1,11 +1,11 @@
 /**
  * Chronix ERP - Superadmin & Multi-Tenant Management Panel
  * Painel em Tela Cheia para Controle Total do Superadmin:
- * - Gestão de Empresas por CNPJ
- * - Upload de Logotipos customizados (PWA & Sistema)
+ * - Visão Geral & Aprovação Rápida de Clientes Pendentes
+ * - Gestão de Empresas por CNPJ & Upload de Logotipos (PWA & Sistema)
  * - Cores de Tema & Título PWA
  * - Dashboards Globais & Métricas Multi-Empresas
- * - Gestão de Usuários, Senhas e Acessos
+ * - Gestão de Usuários, Senhas, Acessos e Exclusão Segura
  * - Visualização/Alternância direta de Empresa Ativa
  */
 
@@ -36,6 +36,13 @@ import {
   TrendingUp,
   Package,
   DollarSign,
+  Search,
+  UserCheck,
+  UserX,
+  Lock,
+  RefreshCw,
+  ArrowRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { User, UserRole, Company } from '../types';
 import { storage, SUPERADMIN_EMAIL, chronixLogoImg } from '../services/storage';
@@ -63,11 +70,16 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   currentUser,
   onRefresh,
 }) => {
-  const [activeTab, setActiveTab] = useState<'companies' | 'dashboards' | 'users'>('companies');
+  const [activeTab, setActiveTab] = useState<'overview' | 'companies' | 'users' | 'dashboards'>('overview');
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // User Deletion Modal Confirmation State
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // New User Form State
   const [isAddingUser, setIsAddingUser] = useState(false);
@@ -96,11 +108,12 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const [resetPasswordValue, setResetPasswordValue] = useState('');
 
   const loadData = () => {
-    setUsers(storage.getUsers());
-    const comps = storage.getCompanies();
-    setCompanies(comps);
-    if (comps.length > 0 && !newUserCompanyId) {
-      setNewUserCompanyId(comps[0].id);
+    const loadedUsers = storage.getUsers();
+    const loadedComps = storage.getCompanies();
+    setUsers(loadedUsers);
+    setCompanies(loadedComps);
+    if (loadedComps.length > 0 && !newUserCompanyId) {
+      setNewUserCompanyId(loadedComps[0].id);
     }
   };
 
@@ -108,12 +121,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     if (isOpen) {
       loadData();
       setFeedback(null);
+      setUserToDelete(null);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
-
-  const isSuper = currentUser.email.toLowerCase() === SUPERADMIN_EMAIL || currentUser.role === 'superadmin';
 
   // File Upload Helper (converts image file to Base64 data URL)
   const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,22 +146,22 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   };
 
   // --- USER ACTIONS ---
-  const handleToggleBlock = (targetUser: User) => {
+  const handleApproveUser = (targetUser: User) => {
     if (targetUser.email.toLowerCase() === SUPERADMIN_EMAIL) {
-      setFeedback({ type: 'error', message: 'O Superadmin Principal não pode ser bloqueado.' });
+      setFeedback({ type: 'error', message: 'O Superadmin Principal já possui acesso total liberado.' });
       return;
     }
 
-    const res = storage.toggleBlockUser(targetUser.id);
+    const res = storage.toggleUserApproval(targetUser.id);
     if (res.success) {
       setFeedback({
         type: 'success',
-        message: `Status do usuário ${targetUser.name} alterado para: ${res.is_blocked ? 'BLOQUEADO' : 'ATIVO'}.`,
+        message: `Acesso do cliente ${targetUser.name} (${targetUser.email}) foi LIBERADO com sucesso!`,
       });
       loadData();
       onRefresh?.();
     } else {
-      setFeedback({ type: 'error', message: res.error || 'Erro ao alterar bloqueio.' });
+      setFeedback({ type: 'error', message: res.error || 'Erro ao liberar acesso do cliente.' });
     }
   };
 
@@ -163,12 +175,31 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     if (res.success) {
       setFeedback({
         type: 'success',
-        message: `Acesso do usuário ${targetUser.name} alterado para: ${res.is_approved ? 'LIBERADO' : 'PENDENTE'}.`,
+        message: `Status de liberação do usuário ${targetUser.name} alterado para: ${res.is_approved ? 'LIBERADO' : 'PENDENTE'}.`,
       });
       loadData();
       onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao alterar liberação de acesso.' });
+    }
+  };
+
+  const handleToggleBlock = (targetUser: User) => {
+    if (targetUser.email.toLowerCase() === SUPERADMIN_EMAIL) {
+      setFeedback({ type: 'error', message: 'O Superadmin Principal não pode ser bloqueado.' });
+      return;
+    }
+
+    const res = storage.toggleBlockUser(targetUser.id);
+    if (res.success) {
+      setFeedback({
+        type: 'success',
+        message: `Status de bloqueio do usuário ${targetUser.name} alterado para: ${res.is_blocked ? 'BLOQUEADO' : 'ATIVO'}.`,
+      });
+      loadData();
+      onRefresh?.();
+    } else {
+      setFeedback({ type: 'error', message: res.error || 'Erro ao alterar bloqueio.' });
     }
   };
 
@@ -194,19 +225,21 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     }
   };
 
-  const handleDeleteUser = (targetUser: User) => {
+  const confirmDeleteUser = (targetUser: User) => {
     if (targetUser.email.toLowerCase() === SUPERADMIN_EMAIL) {
       setFeedback({ type: 'error', message: 'O Superadmin Principal não pode ser excluído.' });
       return;
     }
+    setUserToDelete(targetUser);
+  };
 
-    if (!window.confirm(`Tem certeza que deseja excluir permanentemente o usuário ${targetUser.name}?`)) {
-      return;
-    }
-
-    const res = storage.deleteUser(targetUser.id);
+  const executeDeleteUser = () => {
+    if (!userToDelete) return;
+    const target = userToDelete;
+    const res = storage.deleteUser(target.id);
     if (res.success) {
-      setFeedback({ type: 'success', message: `Usuário ${targetUser.name} excluído do sistema.` });
+      setFeedback({ type: 'success', message: `Usuário ${target.name} (${target.email}) foi excluído permanentemente.` });
+      setUserToDelete(null);
       loadData();
       onRefresh?.();
     } else {
@@ -256,7 +289,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       loadData();
       onRefresh?.();
     } else {
-      setFeedback({ type: 'error', message: res.error || 'Erro ao alterar senha.' });
+      setFeedback({ type: 'error', message: res.error || 'Erro ao redefinir senha.' });
     }
   };
 
@@ -274,6 +307,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     setCompanySupabaseUrl('');
     setCompanySupabaseKey('');
     setIsAddingCompany(true);
+    setActiveTab('companies');
   };
 
   const handleOpenEditCompany = (comp: Company) => {
@@ -289,6 +323,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     setCompanySupabaseUrl(comp.supabase_url || '');
     setCompanySupabaseKey(comp.supabase_key || '');
     setIsAddingCompany(true);
+    setActiveTab('companies');
   };
 
   const handleSaveCompany = (e: React.FormEvent) => {
@@ -331,7 +366,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     if (res.success) {
       setFeedback({
         type: 'success',
-        message: `Status da empresa ${comp.name} alterado para: ${res.status === 'active' ? 'ATIVA' : 'INATIVA'}.`,
+        message: `Status da empresa ${comp.name} alterado para: ${res.status === 'active' ? 'ATIVA' : 'SUSPENSA'}.`,
       });
       loadData();
       onRefresh?.();
@@ -346,7 +381,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     setFeedback({
       type: 'success',
       message: selectedComp
-        ? `Visão alternada para a empresa: ${selectedComp.name} (CNPJ: ${selectedComp.document}).`
+        ? `Visão alternada com sucesso para a empresa: ${selectedComp.name} (CNPJ: ${selectedComp.document}).`
         : 'Visão do sistema restaurada para a empresa padrão.',
     });
     loadData();
@@ -356,10 +391,31 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const currentSelectedCompanyId = storage.getSuperadminSelectedCompanyId();
   const activeCompany = storage.getCurrentUserCompany();
 
-  const filteredUsers =
-    companyFilter === 'all' ? users : users.filter((u) => u.company_id === companyFilter);
+  // Metrics & Calculated Lists
+  const pendingUsers = users.filter((u) => u.is_approved === false && !u.is_blocked && u.email.toLowerCase() !== SUPERADMIN_EMAIL);
+  const blockedUsers = users.filter((u) => u.is_blocked && u.email.toLowerCase() !== SUPERADMIN_EMAIL);
+  const activeUsersCount = users.filter((u) => u.is_approved !== false && !u.is_blocked).length;
 
-  // Global Multi-Company Metrics Calculation
+  const filteredUsers = users.filter((u) => {
+    const matchesCompany = companyFilter === 'all' || u.company_id === companyFilter;
+    const matchesStatus =
+      statusFilter === 'all'
+        ? true
+        : statusFilter === 'pending'
+        ? u.is_approved === false && !u.is_blocked
+        : statusFilter === 'approved'
+        ? u.is_approved !== false && !u.is_blocked
+        : statusFilter === 'blocked'
+        ? u.is_blocked
+        : true;
+    const matchesSearch =
+      searchTerm.trim() === '' ||
+      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+    return matchesCompany && matchesStatus && matchesSearch;
+  });
+
   const allProducts = storage.getProducts();
   const totalStockValuation = allProducts.reduce((acc, p) => acc + (p.current_stock * (p.cost_price || p.sale_price || 0)), 0);
   const activeCompaniesCount = companies.filter((c) => c.status === 'active').length;
@@ -384,11 +440,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               </h2>
               <span className="px-2.5 py-0.5 text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full flex items-center gap-1 uppercase tracking-wider">
                 <Crown className="w-3 h-3 text-amber-400" />
-                Acesso Master
+                Controle Master
               </span>
             </div>
             <p className="text-xs text-slate-400 font-medium">
-              Gestão de CNPJs, Logotipos PWA, Visualização de Empresas & Usuários
+              Gestão de Empresas, Aprovação de Clientes, Senhas & Exclusão de Acessos
             </p>
           </div>
         </div>
@@ -431,15 +487,53 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         </div>
       </header>
 
-      {/* FULLSCREEN TABS HEADER */}
-      <div className="bg-slate-900/90 border-b border-slate-800 px-6 flex items-center justify-between shrink-0">
+      {/* FULLSCREEN NAVIGATION TABS */}
+      <div className="bg-slate-900/90 border-b border-slate-800 px-6 flex items-center justify-between shrink-0 overflow-x-auto">
         <div className="flex gap-2">
+          {/* TAB 1: OVERVIEW / HOMEPAGE */}
+          <button
+            onClick={() => {
+              setActiveTab('overview');
+              setFeedback(null);
+            }}
+            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
+              activeTab === 'overview'
+                ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
+                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <Crown className="w-4 h-4 text-amber-400" />
+            <span>Visão Geral & Clientes Pendentes</span>
+            {pendingUsers.length > 0 && (
+              <span className="px-2 py-0.5 text-[10px] font-black bg-amber-500 text-slate-950 rounded-full animate-pulse shadow-md">
+                {pendingUsers.length}
+              </span>
+            )}
+          </button>
+
+          {/* TAB 2: USERS & ACCESS */}
+          <button
+            onClick={() => {
+              setActiveTab('users');
+              setFeedback(null);
+            }}
+            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
+              activeTab === 'users'
+                ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
+                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <Users className="w-4 h-4 text-emerald-400" />
+            <span>Gestão de Usuários & Acessos ({users.length})</span>
+          </button>
+
+          {/* TAB 3: COMPANIES & LOGOS */}
           <button
             onClick={() => {
               setActiveTab('companies');
               setFeedback(null);
             }}
-            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition ${
+            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
               activeTab === 'companies'
                 ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
                 : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -449,57 +543,53 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             <span>Empresas & Logotipos CNPJ ({companies.length})</span>
           </button>
 
+          {/* TAB 4: DASHBOARDS */}
           <button
             onClick={() => {
               setActiveTab('dashboards');
               setFeedback(null);
             }}
-            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition ${
+            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
               activeTab === 'dashboards'
                 ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
                 : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
             }`}
           >
             <BarChart3 className="w-4 h-4 text-blue-400" />
-            <span>Dashboards & Analytics Globais</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab('users');
-              setFeedback(null);
-            }}
-            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition ${
-              activeTab === 'users'
-                ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
-                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
-            }`}
-          >
-            <Users className="w-4 h-4 text-emerald-400" />
-            <span>Gestão de Usuários & Acessos ({users.length})</span>
+            <span>Analytics & Métricas Globais</span>
           </button>
         </div>
 
-        {activeTab === 'companies' && (
+        <div className="flex items-center gap-2 py-2">
           <button
-            onClick={handleOpenNewCompany}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-blue-600/30 transition active:scale-95"
+            onClick={() => {
+              setIsAddingUser(true);
+              setActiveTab('users');
+            }}
+            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-md transition active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            <span>Cadastrar Nova Empresa</span>
+            <span>Novo Usuário</span>
           </button>
-        )}
+          <button
+            onClick={handleOpenNewCompany}
+            className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-md transition active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nova Empresa</span>
+          </button>
+        </div>
       </div>
 
       {/* FULLSCREEN MAIN CONTENT BODY */}
       <main className="flex-1 overflow-y-auto p-6 bg-slate-950 space-y-6">
-        {/* Feedback Messages */}
+        {/* Toast Feedback Messages */}
         {feedback && (
           <div
-            className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-lg ${
+            className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xl transition border ${
               feedback.type === 'success'
-                ? 'bg-emerald-950/90 text-emerald-200 border border-emerald-700/80'
-                : 'bg-rose-950/90 text-rose-200 border border-rose-700/80'
+                ? 'bg-emerald-950/90 text-emerald-200 border-emerald-700/80 ring-1 ring-emerald-500/30'
+                : 'bg-rose-950/90 text-rose-200 border-rose-700/80 ring-1 ring-rose-500/30'
             }`}
           >
             <div className="flex items-center gap-3">
@@ -508,18 +598,700 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               ) : (
                 <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
               )}
-              <span>{feedback.message}</span>
+              <span className="text-sm">{feedback.message}</span>
             </div>
             <button
               onClick={() => setFeedback(null)}
-              className="text-xs font-bold hover:underline opacity-80"
+              className="text-xs font-extrabold hover:underline opacity-80 bg-slate-900/50 px-3 py-1 rounded-lg"
             >
               Fechar
             </button>
           </div>
         )}
 
-        {/* TAB 1: COMPANIES & LOGO CONFIGURATION */}
+        {/* TAB 1: OVERVIEW (HOME DASHBOARD DO SUPERADMIN) */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* KPI Cards Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card 1: Pending Approvals */}
+              <div
+                onClick={() => {
+                  if (pendingUsers.length > 0) {
+                    setStatusFilter('pending');
+                    setActiveTab('users');
+                  }
+                }}
+                className={`p-5 rounded-3xl border transition shadow-xl flex items-center justify-between cursor-pointer ${
+                  pendingUsers.length > 0
+                    ? 'bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-900 border-amber-500/50 hover:border-amber-400 ring-1 ring-amber-500/20'
+                    : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-2xl border ${
+                    pendingUsers.length > 0 ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-slate-800 border-slate-700 text-slate-400'
+                  }`}>
+                    <ShieldAlert className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Clientes Pendentes</span>
+                    <div className="text-2xl font-black text-white">{pendingUsers.length}</div>
+                    <span className={`text-[11px] font-bold ${pendingUsers.length > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
+                      {pendingUsers.length > 0 ? 'Aguardando sua liberação' : 'Todos liberados'}
+                    </span>
+                  </div>
+                </div>
+                {pendingUsers.length > 0 && <ArrowRight className="w-5 h-5 text-amber-400" />}
+              </div>
+
+              {/* Card 2: Total Companies */}
+              <div
+                onClick={() => setActiveTab('companies')}
+                className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800 hover:border-cyan-500/40 rounded-3xl shadow-xl flex items-center justify-between cursor-pointer transition"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-2xl">
+                    <Building2 className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Empresas Cadastradas</span>
+                    <div className="text-2xl font-black text-white">{companies.length}</div>
+                    <span className="text-[11px] text-emerald-400 font-bold">{activeCompaniesCount} ativas no sistema</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Total Users */}
+              <div
+                onClick={() => {
+                  setStatusFilter('all');
+                  setActiveTab('users');
+                }}
+                className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800 hover:border-emerald-500/40 rounded-3xl shadow-xl flex items-center justify-between cursor-pointer transition"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl">
+                    <Users className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Usuários do Sistema</span>
+                    <div className="text-2xl font-black text-white">{users.length}</div>
+                    <span className="text-[11px] text-emerald-400 font-bold">{activeUsersCount} ativos e liberados</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 4: Multi-tenant Stock Valuation */}
+              <div
+                onClick={() => setActiveTab('dashboards')}
+                className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800 hover:border-amber-500/40 rounded-3xl shadow-xl flex items-center justify-between cursor-pointer transition"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl">
+                    <DollarSign className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Patrimônio Geral</span>
+                    <div className="text-xl font-black text-amber-300">
+                      R$ {totalStockValuation.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-medium">Estoque total em R$</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO PRINCIPAL: CLIENTES AGUARDANDO LIBERAÇÃO (PAINEL DE LIBERAÇÃO RÁPIDA) */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-xl">
+                    <ShieldAlert className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      <span>Liberação de Clientes & Novos Cadastros</span>
+                      {pendingUsers.length > 0 && (
+                        <span className="px-2.5 py-0.5 text-xs font-black bg-amber-500 text-slate-950 rounded-full">
+                          {pendingUsers.length} PENDENTE(S)
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Novos clientes que solicitaram acesso ou se cadastraram aguardando sua autorização master
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setStatusFilter('pending');
+                      setActiveTab('users');
+                    }}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                  >
+                    <Filter className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Ver Todos no Filtro</span>
+                  </button>
+                </div>
+              </div>
+
+              {pendingUsers.length === 0 ? (
+                <div className="p-8 text-center bg-slate-950/60 rounded-2xl border border-slate-800/80 space-y-3">
+                  <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-black text-white">Todos os clientes estão devidamente liberados!</h4>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Nenhum novo cadastro está pendente de aprovação no momento. Quando um novo usuário solicitar acesso, ele aparecerá aqui com destaque para 1-clique de liberação.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingUsers.map((u) => {
+                    const comp = companies.find((c) => c.id === u.company_id);
+                    return (
+                      <div
+                        key={u.id}
+                        className="p-5 bg-gradient-to-br from-amber-950/30 via-slate-950 to-slate-950 border border-amber-500/40 rounded-3xl shadow-xl flex flex-col justify-between space-y-4 relative overflow-hidden"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="font-black text-base text-white">{u.name}</h4>
+                              <span className="text-xs font-mono font-bold text-cyan-300 block">{u.email}</span>
+                            </div>
+                            <span className="px-2.5 py-1 text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full uppercase">
+                              PENDENTE
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-slate-300 space-y-1 pt-2 border-t border-slate-800">
+                            <p className="flex items-center gap-2">
+                              <Building2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                              <span className="font-bold text-white">{comp ? comp.name : 'Sem Empresa'}</span>
+                            </p>
+                            <p className="flex items-center gap-2 text-slate-400">
+                              <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span>Perfil: <strong className="text-amber-300 uppercase">{u.role}</strong></span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Direct Action Buttons for Pending Users */}
+                        <div className="flex items-center gap-2 pt-3 border-t border-slate-800">
+                          <button
+                            onClick={() => handleApproveUser(u)}
+                            className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-1.5 transition active:scale-95"
+                          >
+                            <UserCheck className="w-4 h-4" />
+                            <span>LIBERAR ACESSO</span>
+                          </button>
+
+                          <button
+                            onClick={() => confirmDeleteUser(u)}
+                            className="px-3 py-2 bg-rose-950 hover:bg-rose-900 border border-rose-800 text-rose-200 rounded-xl text-xs font-extrabold flex items-center gap-1 transition active:scale-95"
+                            title="Rejeitar e Excluir Usuário"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>Excluir</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* QUICK OVERVIEW TABLES: EMPRESAS & USUÁRIOS RECENTES */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Empresas Ativas Quick Card */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-cyan-400" />
+                    <span>Empresas Ativas no Sistema</span>
+                  </h3>
+                  <button
+                    onClick={() => setActiveTab('companies')}
+                    className="text-xs text-cyan-400 hover:underline font-bold"
+                  >
+                    Gerenciar Todas ({companies.length})
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {companies.slice(0, 5).map((c) => (
+                    <div
+                      key={c.id}
+                      className="p-3 bg-slate-950 rounded-2xl border border-slate-800/80 flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={c.logo_url || chronixLogoImg}
+                          alt={c.name}
+                          className="w-8 h-8 rounded-lg object-contain bg-slate-900 border border-cyan-500/30 shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div>
+                          <h4 className="font-extrabold text-xs text-white">{c.name}</h4>
+                          <span className="text-[10px] font-mono text-cyan-300">CNPJ: {c.document}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleSelectCompanyView(c.id)}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition flex items-center gap-1 ${
+                          activeCompany.id === c.id
+                            ? 'bg-cyan-500 text-slate-950 shadow-md'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                        }`}
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>{activeCompany.id === c.id ? 'Ativa Agora' : 'Visualizar'}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Usuários Cadastrados Quick Card */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-400" />
+                    <span>Últimos Usuários Cadastrados</span>
+                  </h3>
+                  <button
+                    onClick={() => setActiveTab('users')}
+                    className="text-xs text-emerald-400 hover:underline font-bold"
+                  >
+                    Ver Todos os Usuários ({users.length})
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {users.slice(0, 5).map((u) => {
+                    const isMainSuper = u.email.toLowerCase() === SUPERADMIN_EMAIL;
+                    return (
+                      <div
+                        key={u.id}
+                        className="p-3 bg-slate-950 rounded-2xl border border-slate-800/80 flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {isMainSuper ? (
+                            <Crown className="w-4 h-4 text-amber-400 shrink-0" />
+                          ) : (
+                            <div className="w-7 h-7 bg-slate-800 rounded-full flex items-center justify-center font-bold text-xs text-slate-300">
+                              {u.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="font-extrabold text-xs text-white flex items-center gap-1.5">
+                              <span>{u.name}</span>
+                              {isMainSuper && <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 rounded">SUPER</span>}
+                            </h4>
+                            <span className="text-[10px] font-mono text-slate-400">{u.email}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              u.is_blocked
+                                ? 'bg-rose-950 text-rose-300'
+                                : u.is_approved
+                                ? 'bg-emerald-950 text-emerald-300'
+                                : 'bg-amber-950 text-amber-300'
+                            }`}
+                          >
+                            {u.is_blocked ? 'BLOQUEADO' : u.is_approved ? 'LIBERADO' : 'PENDENTE'}
+                          </span>
+
+                          {!isMainSuper && (
+                            <button
+                              onClick={() => confirmDeleteUser(u)}
+                              className="p-1.5 text-rose-400 hover:text-rose-200 hover:bg-rose-950 rounded-lg transition"
+                              title="Excluir Usuário"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: GESTÃO COMPLETA DE USUÁRIOS & ACESSOS */}
+        {activeTab === 'users' && (
+          <div className="space-y-6">
+            {/* Filter, Search & Add User Header Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900 p-4 border border-slate-800 rounded-3xl shadow-xl">
+              <div className="flex flex-wrap items-center gap-3 flex-1">
+                {/* Search Bar */}
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Buscar usuário por nome ou e-mail..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                {/* Company Filter */}
+                <div className="flex items-center gap-2">
+                  <Filter className="w-3.5 h-3.5 text-cyan-400" />
+                  <select
+                    value={companyFilter}
+                    onChange={(e) => setCompanyFilter(e.target.value)}
+                    className="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none cursor-pointer"
+                  >
+                    <option value="all">Todas as Empresas ({users.length})</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-amber-300 outline-none cursor-pointer"
+                  >
+                    <option value="all">Todos os Status</option>
+                    <option value="pending">Pendentes de Liberação ({pendingUsers.length})</option>
+                    <option value="approved">Liberados / Ativos</option>
+                    <option value="blocked">Bloqueados ({blockedUsers.length})</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsAddingUser(!isAddingUser)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg transition active:scale-95 shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Cadastrar Novo Usuário</span>
+              </button>
+            </div>
+
+            {/* Form for Creating New User */}
+            {isAddingUser && (
+              <form onSubmit={handleCreateUser} className="p-6 bg-slate-900 border border-emerald-500/40 rounded-3xl space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h4 className="text-sm font-black text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    <span>Cadastrar Novo Usuário no Sistema</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingUser(false)}
+                    className="p-1 text-slate-400 hover:text-white rounded-lg bg-slate-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Nome Completo *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ex: Carlos Silva"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">E-mail de Acesso *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="ex: carlos@empresa.com"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Senha Inicial *</label>
+                    <input
+                      type="password"
+                      placeholder="ex: 123456"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Empresa *</label>
+                    <select
+                      value={newUserCompanyId}
+                      onChange={(e) => setNewUserCompanyId(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none cursor-pointer"
+                    >
+                      {companies.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Perfil de Acesso *</label>
+                    <select
+                      value={newUserRole}
+                      onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-amber-300 outline-none cursor-pointer"
+                    >
+                      <option value="admin">Administrador</option>
+                      <option value="funcionario">Funcionário</option>
+                      <option value="superadmin">Superadmin</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingUser(false)}
+                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-700 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg transition active:scale-95"
+                  >
+                    Salvar Usuário
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Users Table */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider font-extrabold border-b border-slate-800">
+                    <tr>
+                      <th className="p-4">Usuário / Nome</th>
+                      <th className="p-4">E-mail</th>
+                      <th className="p-4">Empresa Vinculada</th>
+                      <th className="p-4">Função / Perfil</th>
+                      <th className="p-4">Status Acesso</th>
+                      <th className="p-4 text-right">Ações Rápidas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                    {filteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-slate-400 font-bold">
+                          Nenhum usuário encontrado com os filtros selecionados.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredUsers.map((u) => {
+                        const isMainSuper = u.email.toLowerCase() === SUPERADMIN_EMAIL;
+                        const isResettingThisUser = resettingUserId === u.id;
+
+                        return (
+                          <React.Fragment key={u.id}>
+                            <tr className={`hover:bg-slate-800/40 transition ${u.is_approved === false && !u.is_blocked ? 'bg-amber-950/20' : ''}`}>
+                              <td className="p-4 font-bold text-white">
+                                <div className="flex items-center gap-2.5">
+                                  {isMainSuper ? (
+                                    <Crown className="w-4 h-4 text-amber-400 shrink-0" />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-black text-xs text-cyan-300">
+                                      {u.name.charAt(0).toUpperCase()}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <span className="block text-sm text-white font-extrabold">{u.name}</span>
+                                    {isMainSuper && <span className="text-[10px] text-amber-400 font-bold">Superadmin Principal</span>}
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="p-4 font-mono text-cyan-300 font-semibold">{u.email}</td>
+
+                              <td className="p-4">
+                                <select
+                                  value={u.company_id || ''}
+                                  onChange={(e) => handleCompanyChange(u.id, e.target.value)}
+                                  disabled={isMainSuper}
+                                  className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold outline-none cursor-pointer disabled:opacity-50"
+                                >
+                                  {companies.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+
+                              <td className="p-4">
+                                <select
+                                  value={u.role}
+                                  onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
+                                  disabled={isMainSuper}
+                                  className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-black text-amber-300 outline-none cursor-pointer disabled:opacity-50"
+                                >
+                                  <option value="superadmin">Superadmin</option>
+                                  <option value="admin">Administrador</option>
+                                  <option value="funcionario">Funcionário</option>
+                                </select>
+                              </td>
+
+                              <td className="p-4">
+                                <span
+                                  className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                    u.is_blocked
+                                      ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                      : u.is_approved === false
+                                      ? 'bg-amber-950 text-amber-300 border border-amber-800 animate-pulse'
+                                      : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  }`}
+                                >
+                                  {u.is_blocked ? 'BLOQUEADO' : u.is_approved === false ? 'PENDENTE' : 'LIBERADO'}
+                                </span>
+                              </td>
+
+                              {/* BOTÕES DE AÇÕES REVISADOS E DESTACADOS */}
+                              <td className="p-4 text-right">
+                                {!isMainSuper ? (
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {/* Botão de Liberação de Cliente */}
+                                    {u.is_approved === false ? (
+                                      <button
+                                        onClick={() => handleApproveUser(u)}
+                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-600/30 flex items-center gap-1 transition active:scale-95"
+                                        title="Liberar Acesso do Cliente"
+                                      >
+                                        <UserCheck className="w-4 h-4" />
+                                        <span>LIBERAR</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleToggleApproval(u)}
+                                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[11px] font-bold transition"
+                                        title="Tornar Pendente Novamente"
+                                      >
+                                        Revogar
+                                      </button>
+                                    )}
+
+                                    {/* Botão de Bloqueio */}
+                                    <button
+                                      onClick={() => handleToggleBlock(u)}
+                                      className={`px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition ${
+                                        u.is_blocked
+                                          ? 'bg-emerald-950 hover:bg-emerald-900 text-emerald-200 border border-emerald-800'
+                                          : 'bg-amber-950 hover:bg-amber-900 text-amber-200 border border-amber-800'
+                                      }`}
+                                      title={u.is_blocked ? 'Desbloquear Usuário' : 'Bloquear Acesso'}
+                                    >
+                                      {u.is_blocked ? 'Desbloquear' : 'Bloquear'}
+                                    </button>
+
+                                    {/* Botão de Redefinir Senha */}
+                                    <button
+                                      onClick={() => {
+                                        if (isResettingThisUser) {
+                                          setResettingUserId(null);
+                                        } else {
+                                          setResettingUserId(u.id);
+                                          setResetPasswordValue('');
+                                        }
+                                      }}
+                                      className="p-1.5 bg-slate-800 hover:bg-cyan-950 text-cyan-300 border border-slate-700 hover:border-cyan-700 rounded-xl text-xs font-bold transition"
+                                      title="Redefinir Senha"
+                                    >
+                                      <KeyRound className="w-4 h-4" />
+                                    </button>
+
+                                    {/* Botão de Excluir Usuário */}
+                                    <button
+                                      onClick={() => confirmDeleteUser(u)}
+                                      className="p-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded-xl transition active:scale-95"
+                                      title="Excluir Usuário Permanentemente"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-amber-400 font-bold italic">Protegido (Superadmin)</span>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* Row Inline para Redefinição de Senha */}
+                            {isResettingThisUser && (
+                              <tr className="bg-slate-950/90 border-b border-cyan-500/30">
+                                <td colSpan={6} className="p-4">
+                                  <div className="flex items-center justify-between gap-4 max-w-xl mx-auto bg-slate-900 p-3 rounded-2xl border border-cyan-500/40 shadow-inner">
+                                    <div className="flex items-center gap-2">
+                                      <KeyRound className="w-4 h-4 text-cyan-400" />
+                                      <span className="text-xs font-bold text-white">Nova Senha para {u.name}:</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="password"
+                                        placeholder="Digite a nova senha..."
+                                        value={resetPasswordValue}
+                                        onChange={(e) => setResetPasswordValue(e.target.value)}
+                                        className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono font-bold text-white outline-none focus:border-cyan-500 w-48"
+                                      />
+                                      <button
+                                        onClick={() => handleSaveResetPassword(u.id)}
+                                        className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold shadow transition"
+                                      >
+                                        Salvar Senha
+                                      </button>
+                                      <button
+                                        onClick={() => setResettingUserId(null)}
+                                        className="px-2 py-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: EMPRESAS & LOGOTIPOS CNPJ */}
         {activeTab === 'companies' && (
           <div className="space-y-6">
             {/* Modal / Inline Form for Add or Edit Company */}
@@ -855,7 +1627,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
           </div>
         )}
 
-        {/* TAB 2: GLOBAL MULTI-COMPANY DASHBOARDS */}
+        {/* TAB 4: GLOBAL MULTI-COMPANY DASHBOARDS */}
         {activeTab === 'dashboards' && (
           <div className="space-y-6">
             {/* KPI Cards Row */}
@@ -918,11 +1690,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                 <table className="w-full text-left text-xs text-slate-300">
                   <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider font-extrabold border-b border-slate-800">
                     <tr>
-                      <th className="p-3 rounded-l-xl">Empresa</th>
-                      <th className="p-3">CNPJ</th>
-                      <th className="p-3">Usuários</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3 text-right rounded-r-xl">Ação Direta</th>
+                      <th className="p-3.5 rounded-l-xl">Empresa</th>
+                      <th className="p-3.5">CNPJ</th>
+                      <th className="p-3.5">Usuários Vinculados</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5 text-right rounded-r-xl">Ação Direta</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 font-medium">
@@ -930,7 +1702,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                       const uCount = users.filter((u) => u.company_id === c.id).length;
                       return (
                         <tr key={c.id} className="hover:bg-slate-800/40 transition">
-                          <td className="p-3 font-bold text-white flex items-center gap-2.5">
+                          <td className="p-3.5 font-bold text-white flex items-center gap-2.5">
                             <img
                               src={c.logo_url || chronixLogoImg}
                               alt={c.name}
@@ -939,19 +1711,19 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                             />
                             <span>{c.name}</span>
                           </td>
-                          <td className="p-3 font-mono text-cyan-300">{c.document}</td>
-                          <td className="p-3">{uCount} usuário(s)</td>
-                          <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          <td className="p-3.5 font-mono text-cyan-300">{c.document}</td>
+                          <td className="p-3.5">{uCount} usuário(s)</td>
+                          <td className="p-3.5">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
                               c.status === 'active' ? 'bg-emerald-950 text-emerald-300' : 'bg-rose-950 text-rose-300'
                             }`}>
                               {c.status === 'active' ? 'ATIVA' : 'SUSPENSA'}
                             </span>
                           </td>
-                          <td className="p-3 text-right">
+                          <td className="p-3.5 text-right">
                             <button
                               onClick={() => handleSelectCompanyView(c.id)}
-                              className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-[11px] transition"
+                              className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold text-xs transition shadow-md"
                             >
                               Visualizar Empresa
                             </button>
@@ -965,199 +1737,49 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             </div>
           </div>
         )}
+      </main>
 
-        {/* TAB 3: USER MANAGEMENT & ACCESS CONTROL */}
-        {activeTab === 'users' && (
-          <div className="space-y-6">
-            {/* Filter & Add User Row */}
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900 p-4 border border-slate-800 rounded-3xl">
-              <div className="flex items-center gap-3">
-                <Filter className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-bold text-slate-300">Filtrar por Empresa:</span>
-                <select
-                  value={companyFilter}
-                  onChange={(e) => setCompanyFilter(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none"
-                >
-                  <option value="all">Todas as Empresas ({users.length})</option>
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+      {/* MODAL CONFIRMAÇÃO DE EXCLUSÃO DE USUÁRIO */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-rose-500/40 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-2.5 bg-rose-500/20 border border-rose-500/40 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
               </div>
+              <div>
+                <h3 className="text-base font-black text-white">Excluir Usuário Permanentemente</h3>
+                <p className="text-xs text-rose-300/80">Ação irreversível de remoção de conta</p>
+              </div>
+            </div>
 
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2 text-xs">
+              <p className="text-slate-300 font-medium">
+                Tem certeza que deseja remover o usuário <strong className="text-white">{userToDelete.name}</strong> ({userToDelete.email})?
+              </p>
+              <p className="text-slate-400 text-[11px]">
+                Ele perderá imediatamente o acesso ao Chronix ERP e todas as permissões associadas.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
               <button
-                onClick={() => setIsAddingUser(!isAddingUser)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg transition"
+                onClick={() => setUserToDelete(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
               >
-                <Plus className="w-4 h-4" />
-                <span>Novo Usuário</span>
+                Cancelar
+              </button>
+              <button
+                onClick={executeDeleteUser}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black shadow-lg shadow-rose-600/30 transition active:scale-95 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sim, Excluir Usuário</span>
               </button>
             </div>
-
-            {/* Add User Form */}
-            {isAddingUser && (
-              <form onSubmit={handleCreateUser} className="p-5 bg-slate-900 border border-emerald-500/30 rounded-3xl space-y-4">
-                <h4 className="text-xs font-black text-emerald-400 uppercase tracking-wider">
-                  Cadastrar Novo Usuário no Sistema
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nome Completo *"
-                    value={newUserName}
-                    onChange={(e) => setNewUserName(e.target.value)}
-                    className="px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none"
-                  />
-                  <input
-                    type="email"
-                    required
-                    placeholder="E-mail *"
-                    value={newUserEmail}
-                    onChange={(e) => setNewUserEmail(e.target.value)}
-                    className="px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none"
-                  />
-                  <input
-                    type="password"
-                    placeholder="Senha *"
-                    value={newUserPassword}
-                    onChange={(e) => setNewUserPassword(e.target.value)}
-                    className="px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none"
-                  />
-                  <select
-                    value={newUserCompanyId}
-                    onChange={(e) => setNewUserCompanyId(e.target.value)}
-                    className="px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none"
-                  >
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingUser(false)}
-                    className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md"
-                  >
-                    Salvar Usuário
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Users Table */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider font-extrabold border-b border-slate-800">
-                    <tr>
-                      <th className="p-3.5">Usuário</th>
-                      <th className="p-3.5">E-mail</th>
-                      <th className="p-3.5">Empresa</th>
-                      <th className="p-3.5">Perfil</th>
-                      <th className="p-3.5">Status</th>
-                      <th className="p-3.5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-medium">
-                    {filteredUsers.map((u) => {
-                      const isMainSuper = u.email.toLowerCase() === SUPERADMIN_EMAIL;
-
-                      return (
-                        <tr key={u.id} className="hover:bg-slate-800/40 transition">
-                          <td className="p-3.5 font-bold text-white flex items-center gap-2">
-                            {isMainSuper && <Crown className="w-4 h-4 text-amber-400 shrink-0" />}
-                            <span>{u.name}</span>
-                          </td>
-                          <td className="p-3.5 font-mono text-cyan-300">{u.email}</td>
-                          <td className="p-3.5">
-                            <select
-                              value={u.company_id || ''}
-                              onChange={(e) => handleCompanyChange(u.id, e.target.value)}
-                              disabled={isMainSuper}
-                              className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 outline-none cursor-pointer"
-                            >
-                              {companies.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="p-3.5">
-                            <select
-                              value={u.role}
-                              onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
-                              disabled={isMainSuper}
-                              className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-amber-300 outline-none cursor-pointer"
-                            >
-                              <option value="superadmin">Superadmin</option>
-                              <option value="admin">Administrador</option>
-                              <option value="funcionario">Funcionário</option>
-                            </select>
-                          </td>
-                          <td className="p-3.5">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              u.is_blocked
-                                ? 'bg-rose-950 text-rose-300'
-                                : u.is_approved
-                                ? 'bg-emerald-950 text-emerald-300'
-                                : 'bg-amber-950 text-amber-300'
-                            }`}>
-                              {u.is_blocked ? 'BLOQUEADO' : u.is_approved ? 'LIBERADO' : 'PENDENTE'}
-                            </span>
-                          </td>
-                          <td className="p-3.5 text-right space-x-1.5">
-                            {!isMainSuper && (
-                              <>
-                                <button
-                                  onClick={() => handleToggleApproval(u)}
-                                  className="px-2.5 py-1 bg-blue-950 hover:bg-blue-900 text-blue-200 rounded-lg text-[11px] font-bold"
-                                >
-                                  {u.is_approved ? 'Pendente' : 'Liberar'}
-                                </button>
-                                <button
-                                  onClick={() => handleToggleBlock(u)}
-                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
-                                    u.is_blocked
-                                      ? 'bg-emerald-950 text-emerald-200'
-                                      : 'bg-rose-950 text-rose-200'
-                                  }`}
-                                >
-                                  {u.is_blocked ? 'Desbloquear' : 'Bloquear'}
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteUser(u)}
-                                  className="p-1.5 text-rose-400 hover:text-rose-200 rounded-lg"
-                                  title="Excluir Usuário"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 };

@@ -141,7 +141,7 @@ export interface FiadoSale {
   interest_amount?: number;
   total_amount: number;
   payment_method: PaymentMethod;
-  status: 'aberto' | 'pago';
+  status: 'aberto' | 'pago' | 'cancelado';
   paid_at?: string;
   notes?: string;
   installments_count?: number;
@@ -176,7 +176,7 @@ export interface Batch {
 }
 
 export type MovementType = 'entrada' | 'saida' | 'ajuste';
-export type MovementOrigin = 'manual' | 'xml' | 'inventario';
+export type MovementOrigin = 'manual' | 'xml' | 'inventario' | 'venda_rapida' | 'pre_venda' | 'fiado' | 'pdv';
 
 export interface Movement {
   id: string;
@@ -200,6 +200,7 @@ export interface Movement {
   batch_number?: string;
   expiration_date?: string;
   origin: MovementOrigin;
+  payment_method?: string;
   notes?: string;
   xml_import_id?: string;
   nfe_number?: string;
@@ -331,4 +332,72 @@ export interface SystemSettings {
   auto_clear_form: boolean;      // default: true ("Limpar tela automaticamente")
   fiado_interest_rate: number;   // default: 5 (5%)
 }
+
+export interface DailyConferenceStockItem {
+  product_id: string;
+  product_name: string;
+  unit: string;
+  initial_stock: number;
+  entries_today: number;
+  exits_today: number;
+  expected_stock: number; // initial_stock + entries_today - exits_today
+  physical_stock: number;  // input by manager
+  diff_stock: number;      // physical_stock - expected_stock
+  cost_price: number;
+  estimated_diff_value: number; // diff_stock * cost_price
+}
+
+export interface DailyConferenceFinancial {
+  total_sold: number;
+  expected_dinheiro: number;
+  expected_pix: number;
+  expected_cartao: number;
+  expected_fiado: number;
+  
+  actual_dinheiro: number;
+  actual_pix: number;
+  actual_cartao: number;
+  
+  diff_dinheiro: number;
+  diff_pix: number;
+  diff_cartao: number;
+  total_financial_diff: number;
+}
+
+export interface DailyConference {
+  id: string;
+  date: string; // YYYY-MM-DD
+  closed_at?: string;
+  operator_id: string;
+  operator_name: string;
+  status: 'em_aberto' | 'fechada';
+  
+  // Daily Summary metrics
+  total_entries_count: number;
+  total_exits_count: number;
+  total_sold_amount: number;
+  total_received_amount: number;
+  sales_count: number;
+  clients_served_count: number;
+  products_sold_count: number;
+  
+  // Stock Conference items
+  stock_items: DailyConferenceStockItem[];
+  total_stock_loss_value: number;
+  total_stock_gain_value: number;
+  
+  // Financial Conference
+  financial: DailyConferenceFinancial;
+  
+  notes?: string;
+  
+  // Prepared fields for future expansion:
+  vendor_id?: string;
+  vendor_name?: string;
+  vehicle_info?: string;
+  
+  created_at: string;
+  updated_at: string;
+}
+
 

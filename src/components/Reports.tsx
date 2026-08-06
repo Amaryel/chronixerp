@@ -23,7 +23,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Product, Batch, Movement, Category, FiadoSale, FiadoPayment, Customer } from '../types';
-import { exportToPDF, exportToExcel, exportToCSV } from '../lib/exportUtils';
+import { exportToPDF, exportToExcel, exportToCSV, printReport } from '../lib/exportUtils';
 import { formatStockDisplay } from '../lib/unitConverter';
 import { storage } from '../services/storage';
 
@@ -34,7 +34,7 @@ interface ReportsProps {
   categories: Category[];
 }
 
-type PeriodFilter = 'all' | 'today' | '7days' | 'month';
+type PeriodFilter = 'all' | 'today' | '7days' | 'month' | 'custom';
 
 export const Reports: React.FC<ReportsProps> = ({
   products,
@@ -47,29 +47,60 @@ export const Reports: React.FC<ReportsProps> = ({
   >('current_stock');
 
   const [period, setPeriod] = useState<PeriodFilter>('month');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
+  const [appliedPeriod, setAppliedPeriod] = useState<PeriodFilter>('month');
+  const [appliedStartDate, setAppliedStartDate] = useState<string>('');
+  const [appliedEndDate, setAppliedEndDate] = useState<string>('');
 
   // Load sales, fiado payments, and customers from storage
   const allSales: FiadoSale[] = useMemo(() => storage.getFiadoSales(), [movements]);
   const allFiadoPayments: FiadoPayment[] = useMemo(() => storage.getFiadoPayments(), [movements]);
   const customers: Customer[] = useMemo(() => storage.getCustomers(), [movements]);
 
+  const handleApplyFilter = (p?: PeriodFilter, s?: string, e?: string) => {
+    const targetPeriod = p !== undefined ? p : period;
+    const targetStart = s !== undefined ? s : startDate;
+    const targetEnd = e !== undefined ? e : endDate;
+
+    setAppliedPeriod(targetPeriod);
+    setAppliedStartDate(targetStart);
+    setAppliedEndDate(targetEnd);
+  };
+
   // Helper date filter
   const isDateInPeriod = (dateStr: string) => {
-    if (period === 'all') return true;
+    if (!dateStr) return false;
     const date = new Date(dateStr);
+
+    if (appliedPeriod === 'custom' || appliedStartDate || appliedEndDate) {
+      if (appliedStartDate) {
+        const start = new Date(appliedStartDate + 'T00:00:00');
+        if (date < start) return false;
+      }
+      if (appliedEndDate) {
+        const end = new Date(appliedEndDate + 'T23:59:59');
+        if (date > end) return false;
+      }
+      return true;
+    }
+
+    if (appliedPeriod === 'all') return true;
+
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    if (period === 'today') {
+    if (appliedPeriod === 'today') {
       return date >= startOfToday;
     }
 
-    if (period === '7days') {
+    if (appliedPeriod === '7days') {
       const d7 = new Date(startOfToday.getTime() - 7 * 86400000);
       return date >= d7;
     }
 
-    if (period === 'month') {
+    if (appliedPeriod === 'month') {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       return date >= startOfMonth;
     }
@@ -80,15 +111,15 @@ export const Reports: React.FC<ReportsProps> = ({
   // Filtered datasets
   const filteredMovements = useMemo(() => {
     return movements.filter((m) => isDateInPeriod(m.date));
-  }, [movements, period]);
+  }, [movements, appliedPeriod, appliedStartDate, appliedEndDate]);
 
   const filteredSales = useMemo(() => {
     return allSales.filter((s) => isDateInPeriod(s.date));
-  }, [allSales, period]);
+  }, [allSales, appliedPeriod, appliedStartDate, appliedEndDate]);
 
   const filteredFiadoPayments = useMemo(() => {
     return allFiadoPayments.filter((p) => isDateInPeriod(p.date));
-  }, [allFiadoPayments, period]);
+  }, [allFiadoPayments, appliedPeriod, appliedStartDate, appliedEndDate]);
 
   // Calculations for Stock Report
   const stockValuation = useMemo(() => {
@@ -320,22 +351,78 @@ export const Reports: React.FC<ReportsProps> = ({
 
         {/* Period Filter & Export Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Period Select */}
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-            <Filter className="w-3.5 h-3.5 text-slate-500 ml-1.5" />
-            {(['today', '7days', 'month', 'all'] as PeriodFilter[]).map((p) => (
+          {/* Period Select & Custom Date Picker */}
+          <div className="flex items-center gap-2 flex-wrap bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5 text-slate-500 ml-1" />
+              {(['today', '7days', 'month', 'all'] as PeriodFilter[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setPeriod(p);
+                    setStartDate('');
+                    setEndDate('');
+                    handleApplyFilter(p, '', '');
+                  }}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition ${
+                    appliedPeriod === p && !appliedStartDate && !appliedEndDate
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {p === 'today' ? 'Hoje' : p === '7days' ? '7 Dias' : p === 'month' ? 'Este Mês' : 'Todos'}
+                </button>
+              ))}
+            </div>
+
+            <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 hidden sm:block" />
+
+            <div className="flex items-center gap-1.5 text-xs">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setPeriod('custom');
+                }}
+                className="px-2 py-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-[11px] font-medium outline-none focus:ring-1 focus:ring-blue-500"
+                title="Data Inicial"
+              />
+              <span className="text-slate-400 font-bold text-[10px]">até</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setPeriod('custom');
+                }}
+                className="px-2 py-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-[11px] font-medium outline-none focus:ring-1 focus:ring-blue-500"
+                title="Data Final"
+              />
+
               <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition ${
-                  period === p
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                }`}
+                onClick={() => handleApplyFilter()}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs flex items-center gap-1 shadow-sm transition active:scale-95"
+                title="Clique para aplicar os filtros no relatório"
               >
-                {p === 'today' ? 'Hoje' : p === '7days' ? '7 Dias' : p === 'month' ? 'Este Mês' : 'Todos'}
+                <Filter className="w-3.5 h-3.5" />
+                <span>Filtrar</span>
               </button>
-            ))}
+
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setPeriod('month');
+                    handleApplyFilter('month', '', '');
+                  }}
+                  className="px-1.5 py-0.5 text-[10px] font-bold text-rose-600 hover:text-rose-800 dark:text-rose-400"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
@@ -366,8 +453,8 @@ export const Reports: React.FC<ReportsProps> = ({
           </button>
 
           <button
-            onClick={() => window.print()}
-            className="p-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs transition"
+            onClick={() => printReport(currentData)}
+            className="p-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs transition"
             title="Imprimir Relatório"
           >
             <Printer className="w-4 h-4" />

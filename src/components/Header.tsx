@@ -116,16 +116,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Quick Scanner shortcut button */}
-          <button
-            onClick={onOpenScanner}
-            title="Escanear Código de Barras"
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
-          >
-            <Smartphone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <span className="hidden md:inline">Câmera / EAN</span>
-          </button>
-
           {/* Superadmin User Management shortcut */}
           {isSuperadmin && onOpenUserManagement && (
             <button

@@ -33,6 +33,7 @@ import {
   PreSaleItem,
   SystemSettings,
   Company,
+  DailyConference,
 } from '../types';
 
 import { convertToMainUnit, normalizeUnitToken } from '../lib/unitConverter';
@@ -59,6 +60,7 @@ const STORAGE_KEYS = {
   FIADO_PAYMENTS: 'aquinos_fiado_payments',
   PRE_SALES: 'aquinos_pre_sales',
   SETTINGS: 'aquinos_settings',
+  DAILY_CONFERENCES: 'aquinos_daily_conferences',
 };
 
 // Default Companies (Multi-Empresas / White Label)
@@ -248,9 +250,7 @@ class StorageService {
     }
 
     const currUserStr = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (!currUserStr) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_USERS[0]));
-    } else {
+    if (currUserStr) {
       try {
         const parsed = JSON.parse(currUserStr);
         if (parsed.email && parsed.email.toLowerCase() === SUPERADMIN_EMAIL) {
@@ -259,7 +259,7 @@ class StorageService {
           localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(parsed));
         }
       } catch {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_USERS[0]));
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
       }
     }
 
@@ -439,6 +439,14 @@ class StorageService {
 
   public getActiveSession(): User | null {
     try {
+      const rememberMe = localStorage.getItem('aquinos_remember_me') === 'true';
+      const sessionActive = sessionStorage.getItem('aquinos_session_active') === 'true';
+
+      if (!rememberMe && !sessionActive) {
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        return null;
+      }
+
       const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
       if (!data) return null;
       const user: User = JSON.parse(data);
@@ -447,11 +455,13 @@ class StorageService {
       const dbUser = users.find((u) => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
       if (dbUser && dbUser.is_blocked) {
         localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        sessionStorage.removeItem('aquinos_session_active');
         return null;
       }
       if (dbUser) return dbUser;
       return user;
     } catch {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
       return null;
     }
   }
@@ -462,6 +472,7 @@ class StorageService {
 
   public setCurrentUser(user: User): void {
     this.setItem(STORAGE_KEYS.CURRENT_USER, user);
+    sessionStorage.setItem('aquinos_session_active', 'true');
     this.addAuditLog('troca_perfil', `Sessão ativa para ${user.name} (${user.role.toUpperCase()})`);
   }
 
@@ -491,48 +502,43 @@ class StorageService {
       return { success: false, error: 'Usuário não encontrado com este e-mail. Solicite o cadastro ao Administrador.' };
     }
 
-    // Always ensure superadmin role and auto-update password if superadmin login
+    // Check if blocked
+    if (found.is_blocked) {
+      return {
+        success: false,
+        error: 'Sua conta foi bloqueada. Entre em contato com o suporte ou Superadmin.',
+      };
+    }
+
+    // Check if approved
+    if (found.is_approved === false) {
+      return {
+        success: false,
+        error: 'Sua conta está pendente de liberação pelo Superadmin.',
+      };
+    }
+
+    // Password verification for ALL users
+    const expectedPassword = found.password || '123';
+    if (password && expectedPassword !== password) {
+      return { success: false, error: 'Senha incorreta. Tente novamente.' };
+    }
+
+    // Check company status if user belongs to a company
+    if (found.company_id && cleanEmail !== SUPERADMIN_EMAIL) {
+      const company = this.getCompanyById(found.company_id);
+      if (company && company.status === 'blocked') {
+        return {
+          success: false,
+          error: `A empresa ${company.name} está inativa no sistema. Acesso suspenso.`,
+        };
+      }
+    }
+
     if (cleanEmail === SUPERADMIN_EMAIL) {
       found.role = 'superadmin';
       found.is_approved = true;
       found.is_blocked = false;
-      found.company_id = found.company_id || 'comp-aquino';
-      if (password) {
-        found.password = password;
-        this.setItem(STORAGE_KEYS.USERS, users);
-      }
-    } else {
-      // Check if blocked
-      if (found.is_blocked) {
-        return {
-          success: false,
-          error: 'Sua conta foi bloqueada. Entre em contato com o suporte ou Superadmin.',
-        };
-      }
-
-      // Check if approved
-      if (found.is_approved === false) {
-        return {
-          success: false,
-          error: 'Sua conta está pendente de liberação pelo Superadmin.',
-        };
-      }
-
-      // Check password
-      if (password && found.password && found.password !== password) {
-        return { success: false, error: 'Senha incorreta. Tente novamente.' };
-      }
-
-      // Check company status if user belongs to a company
-      if (found.company_id) {
-        const company = this.getCompanyById(found.company_id);
-        if (company && company.status === 'blocked') {
-          return {
-            success: false,
-            error: `A empresa ${company.name} está inativa no sistema. Acesso suspenso.`,
-          };
-        }
-      }
     }
 
     this.setCurrentUser(found);
@@ -632,6 +638,18 @@ class StorageService {
 
   public logout(): void {
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem('aquinos_remember_me');
+    localStorage.removeItem('aquinos_saved_email');
+    localStorage.removeItem('aquinos_saved_password');
+    sessionStorage.removeItem('aquinos_session_active');
+    try {
+      const client = getSupabaseClient();
+      if (client && client.auth) {
+        client.auth.signOut();
+      }
+    } catch {
+      // ignore
+    }
     this.notify();
   }
 
@@ -1046,6 +1064,8 @@ class StorageService {
       expiration_date: expirationDate,
       origin,
       notes,
+      xml_import_id: xmlImportId,
+      nfe_number: nfeNumber,
       created_at: new Date().toISOString(),
     };
 
@@ -1801,7 +1821,7 @@ class StorageService {
 
   public deleteXmlImport(id: string): boolean {
     const user = this.getCurrentUser();
-    if (user.role !== 'admin') {
+    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
       throw new Error('Apenas Administradores podem excluir histórico de XML.');
     }
 
@@ -1814,7 +1834,7 @@ class StorageService {
 
   public deleteXmlImportWithStockRollback(importId: string): { success: boolean; rolledBackItems: number } {
     const user = this.getCurrentUser();
-    if (user.role !== 'admin') {
+    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
       throw new Error('Apenas Administradores podem excluir entradas XML e reverter estoque.');
     }
 
@@ -1831,10 +1851,14 @@ class StorageService {
 
     // Find all movements associated with this NFe
     const movementsToRemove = movements.filter(
-      (m) => m.origin === 'xml' && (
-        (m.notes && (m.notes.includes(`NFe #${nfeNum}`) || m.notes.includes(nfeNum))) ||
-        (xmlImp.supplier_name && m.supplier_name === xmlImp.supplier_name && Math.abs(new Date(m.date).getTime() - new Date(xmlImp.import_date).getTime()) < 3600000)
-      )
+      (m) =>
+        m.xml_import_id === importId ||
+        (m.origin === 'xml' &&
+          ((nfeNum && m.nfe_number === nfeNum) ||
+            (m.notes && nfeNum && (m.notes.includes(`NFe #${nfeNum}`) || m.notes.includes(nfeNum))) ||
+            (xmlImp.supplier_name &&
+              m.supplier_name === xmlImp.supplier_name &&
+              Math.abs(new Date(m.date).getTime() - new Date(xmlImp.import_date).getTime()) < 3600000)))
     );
 
     // Rollback stock for each movement
@@ -2172,6 +2196,55 @@ class StorageService {
       if (found) return found;
     }
     return companies[0] || DEFAULT_COMPANIES[0];
+  }
+
+  // --- DAILY CONFERENCES (Carga do Vendedor / Conferência Diária) ---
+  public getDailyConferences(): DailyConference[] {
+    return this.getItem<DailyConference[]>(STORAGE_KEYS.DAILY_CONFERENCES, []);
+  }
+
+  public getDailyConferenceByDate(dateStr: string): DailyConference | undefined {
+    const list = this.getDailyConferences();
+    return list.find((c) => c.date === dateStr);
+  }
+
+  public saveDailyConference(conference: DailyConference): void {
+    const list = this.getDailyConferences();
+    const index = list.findIndex((c) => c.id === conference.id || c.date === conference.date);
+    let updatedList: DailyConference[];
+
+    if (index >= 0) {
+      updatedList = [...list];
+      updatedList[index] = {
+        ...conference,
+        updated_at: new Date().toISOString(),
+      };
+    } else {
+      updatedList = [
+        {
+          ...conference,
+          created_at: conference.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        ...list,
+      ];
+    }
+
+    this.setItem(STORAGE_KEYS.DAILY_CONFERENCES, updatedList);
+    this.addAuditLog(
+      'inventario',
+      `Conferência Diária (${conference.date}) ${conference.status === 'fechada' ? 'FECHADA' : 'SALVA'} por ${conference.operator_name}`
+    );
+  }
+
+  public deleteDailyConference(id: string): void {
+    const list = this.getDailyConferences();
+    const target = list.find((c) => c.id === id);
+    if (!target) return;
+
+    const filtered = list.filter((c) => c.id !== id);
+    this.setItem(STORAGE_KEYS.DAILY_CONFERENCES, filtered);
+    this.addAuditLog('inventario', `Conferência Diária (${target.date}) excluída.`);
   }
 }
 
