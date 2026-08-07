@@ -21,6 +21,8 @@ import {
   Calendar,
   Layers,
   FileText,
+  Truck,
+  Building2,
 } from 'lucide-react';
 import { Product, Customer, PaymentMethod, FiadoSaleItem, FiadoSale, PreSale } from '../types';
 import { storage } from '../services/storage';
@@ -67,6 +69,11 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
 
   // Fiado Interest Toggle
   const [applyFiadoInterest, setApplyFiadoInterest] = useState<boolean>(true);
+
+  // Stock Origin: Empresa vs Carga do Vendedor
+  const [stockOrigin, setStockOrigin] = useState<'empresa' | 'carga'>('empresa');
+  const [selectedSellerLoadId, setSelectedSellerLoadId] = useState<string>('');
+  const activeSellerLoads = storage.getActiveSellerLoads();
 
   // Checkout modal
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -342,11 +349,16 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
       return;
     }
 
+    if (stockOrigin === 'carga' && !selectedSellerLoadId) {
+      alert('Selecione qual Carga do Vendedor originou esta venda.');
+      return;
+    }
+
     setErrorMessage(null);
 
-    // Verify stock if negative stock is disabled
+    // Verify stock if negative stock is disabled (only for main company stock)
     const settings = storage.getSettings();
-    if (!settings.allow_negative_stock) {
+    if (stockOrigin === 'empresa' && !settings.allow_negative_stock) {
       const insufficient = cart.filter((item) => item.qty > item.product.current_stock);
       if (insufficient.length > 0) {
         setStockAlertModal({
@@ -364,17 +376,19 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
     }
 
     try {
-      // 1. Process stock outputs for each item
+      // 1. Process stock outputs for each item (only if from main company stock)
       const saleItems: FiadoSaleItem[] = [];
 
       for (const item of cart) {
-        storage.registerExit({
-          productId: item.product.id,
-          usedQty: item.qty,
-          usedUnit: item.unit,
-          origin: 'manual',
-          notes: `Venda Rápida (${paymentMethod.toUpperCase()})`,
-        });
+        if (stockOrigin === 'empresa') {
+          storage.registerExit({
+            productId: item.product.id,
+            usedQty: item.qty,
+            usedUnit: item.unit,
+            origin: 'manual',
+            notes: `Venda Rápida (${paymentMethod.toUpperCase()})`,
+          });
+        }
 
         saleItems.push({
           product_id: item.product.id,
@@ -409,7 +423,28 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
         paid_at: paymentMethod !== 'fiado' ? new Date().toISOString() : undefined,
         installments_count: paymentMethod === 'fiado' ? installmentsCount : 1,
         first_due_date: paymentMethod === 'fiado' ? firstDueDate : undefined,
+        notes: stockOrigin === 'carga' ? `Venda realizada da Carga do Vendedor #${selectedSellerLoadId}` : undefined,
       });
+
+      // 3. If sale origin is Seller Load, record in the load
+      if (stockOrigin === 'carga' && selectedSellerLoadId) {
+        storage.recordSaleInSellerLoad(selectedSellerLoadId, {
+          sale_id: createdSale.id,
+          type: paymentMethod === 'fiado' ? 'fiado' : 'venda_rapida',
+          date: new Date().toISOString(),
+          customer_name: customer?.name,
+          total_amount: cartGrandTotal,
+          payment_method: paymentMethod,
+          items: saleItems.map((i) => ({
+            product_id: i.product_id,
+            product_name: i.product_name,
+            quantity: i.quantity,
+            unit: i.unit,
+            unit_price: i.unit_price,
+            total_price: i.total_price,
+          })),
+        });
+      }
 
       // Update pre-sale status if converted from pre-sale
       if (loadedPreSaleId) {
@@ -1021,6 +1056,65 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
                   </select>
                 </div>
               </div>
+            </div>
+
+            {/* Origem do Estoque da Venda (Empresa vs Carga do Vendedor) */}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Origem do Estoque da Venda:
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStockOrigin('empresa')}
+                  className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    stockOrigin === 'empresa'
+                      ? 'border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-extrabold ring-1 ring-blue-500/30'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Estoque Empresa</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockOrigin('carga')}
+                  className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    stockOrigin === 'carga'
+                      ? 'border-amber-600 bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 font-extrabold ring-1 ring-amber-500/30'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Carga Vendedor</span>
+                </button>
+              </div>
+
+              {stockOrigin === 'carga' && (
+                <div className="pt-2">
+                  <label className="block text-[11px] font-bold text-amber-800 dark:text-amber-300 mb-1">
+                    Selecione a Carga Ativa:
+                  </label>
+                  {activeSellerLoads.length === 0 ? (
+                    <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold p-2 bg-rose-50 dark:bg-rose-950/40 rounded-lg">
+                      Nenhuma carga aberta em viagem. Crie uma nova carga no módulo "Carga do Vendedor".
+                    </p>
+                  ) : (
+                    <select
+                      value={selectedSellerLoadId}
+                      onChange={(e) => setSelectedSellerLoadId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold text-xs"
+                    >
+                      <option value="">-- Escolha a Carga --</option>
+                      {activeSellerLoads.map((load) => (
+                        <option key={load.id} value={load.id}>
+                          #{load.code} - {load.vendor_name} ({load.departure_date})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Payment Method Selector Grid */}

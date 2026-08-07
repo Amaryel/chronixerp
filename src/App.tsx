@@ -25,6 +25,10 @@ import { BulkPriceUpdate } from './components/BulkPriceUpdate';
 import { BulkStockAdjustment } from './components/BulkStockAdjustment';
 import { Reports } from './components/Reports';
 import { CargaVendedor } from './components/CargaVendedor';
+import { SupportModal } from './components/SupportModal';
+import { ContextHelpDrawer } from './components/ContextHelpDrawer';
+import { GuidedTourModal } from './components/GuidedTourModal';
+import { HelpCenter } from './components/HelpCenter';
 
 import { Product, Batch, Movement, Category, Supplier, User, Company } from './types';
 import { storage, SUPERADMIN_EMAIL } from './services/storage';
@@ -61,6 +65,9 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isContextHelpOpen, setIsContextHelpOpen] = useState(false);
+  const [isGuidedTourOpen, setIsGuidedTourOpen] = useState(false);
 
   // Sync state from storage
   const loadState = () => {
@@ -188,6 +195,13 @@ export default function App() {
         onOpenUserManagement={() => setIsUserManagementModalOpen(true)}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
         onOpenScanner={() => setIsScannerOpen(true)}
+        onOpenContextHelp={() => setIsContextHelpOpen(true)}
+        onOpenSupport={() => setIsSupportModalOpen(true)}
+        impersonatedCompanyId={storage.getImpersonatedCompanyId()}
+        onClearImpersonation={() => {
+          storage.setImpersonatedCompanyId(null);
+          loadState();
+        }}
         onLogout={() => {
           storage.logout();
           loadState();
@@ -311,9 +325,40 @@ export default function App() {
             onRefresh={loadState}
           />
         )}
+
+        {activeTab === 'help_center' && (
+          <HelpCenter
+            currentUser={currentUser}
+            activeCompany={activeCompany}
+            onOpenSupport={() => setIsSupportModalOpen(true)}
+            onStartTour={() => setIsGuidedTourOpen(true)}
+          />
+        )}
       </main>
 
       {/* Modals */}
+      <SupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+        currentUser={currentUser}
+        activeCompany={activeCompany}
+        activeTab={activeTab}
+      />
+
+      <ContextHelpDrawer
+        isOpen={isContextHelpOpen}
+        onClose={() => setIsContextHelpOpen(false)}
+        activeTab={activeTab}
+        onOpenSupport={() => setIsSupportModalOpen(true)}
+        onStartTour={() => setIsGuidedTourOpen(true)}
+        onOpenHelpCenter={() => setActiveTab('help_center')}
+      />
+
+      <GuidedTourModal
+        isOpen={isGuidedTourOpen}
+        onClose={() => setIsGuidedTourOpen(false)}
+        onComplete={() => {}}
+      />
       <MovementModal
         isOpen={isEntryModalOpen}
         type="entrada"

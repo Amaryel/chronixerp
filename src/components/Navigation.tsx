@@ -21,6 +21,7 @@ import {
   FolderKanban,
   ArrowRightLeft,
   CheckCircle2,
+  Truck,
 } from 'lucide-react';
 
 export type NavTab =
@@ -36,7 +37,8 @@ export type NavTab =
   | 'reports'
   | 'history'
   | 'settings'
-  | 'bulk_prices';
+  | 'bulk_prices'
+  | 'help_center';
 
 interface NavigationProps {
   activeTab: NavTab;
@@ -252,7 +254,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               <span>Ajuste de Estoque</span>
             </button>
 
-            {/* 7. Carga do Vendedor */}
+            {/* 7. Rota de Vendas */}
             <button
               onClick={() => setActiveTab('carga_vendedor')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
@@ -261,8 +263,8 @@ export const Navigation: React.FC<NavigationProps> = ({
                   : 'hover:bg-slate-800 text-emerald-400 font-bold'
               }`}
             >
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Carga do Vendedor</span>
+              <Truck className="w-4 h-4 text-emerald-400" />
+              <span>Rota de Vendas</span>
             </button>
 
             {/* 8. Relatórios */}
@@ -366,8 +368,8 @@ export const Navigation: React.FC<NavigationProps> = ({
                 : 'text-slate-500 dark:text-slate-400'
             }`}
           >
-            <CheckCircle2 className="w-5 h-5 mb-0.5 text-emerald-500" />
-            <span>Carga</span>
+            <Truck className="w-5 h-5 mb-0.5 text-emerald-500" />
+            <span>Rota</span>
           </button>
 
           <button

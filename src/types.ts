@@ -11,10 +11,13 @@ export interface Company {
   phone?: string;
   address?: string;
   email?: string;
+  owner_name?: string;
+  plan?: string;
+  notes?: string;
   logo_url?: string; // Custom company logo (base64 or image URL)
   theme_color?: string; // Hex color code for company branding (e.g. #0284c7)
   pwa_title?: string; // Custom title for PWA
-  status: 'active' | 'blocked' | 'pending';
+  status: 'active' | 'blocked' | 'pending' | 'canceled';
   supabase_url?: string;
   supabase_key?: string;
   created_at: string;
@@ -176,7 +179,7 @@ export interface Batch {
 }
 
 export type MovementType = 'entrada' | 'saida' | 'ajuste';
-export type MovementOrigin = 'manual' | 'xml' | 'inventario' | 'venda_rapida' | 'pre_venda' | 'fiado' | 'pdv';
+export type MovementOrigin = 'manual' | 'xml' | 'inventario' | 'venda_rapida' | 'pre_venda' | 'fiado' | 'pdv' | 'carga_vendedor';
 
 export interface Movement {
   id: string;
@@ -398,6 +401,134 @@ export interface DailyConference {
   
   created_at: string;
   updated_at: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  company_id: string;
+  company_name: string;
+  subject: string;
+  description: string;
+  attachment_url?: string;
+  screen: string;
+  technical_info: {
+    screen: string;
+    date: string;
+    browser: string;
+    os: string;
+    device: string;
+    app_version: string;
+  };
+  status: 'Aberto' | 'Em Atendimento' | 'Resolvido' | 'Fechado';
+  admin_notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeTutorial {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  content_markdown: string;
+  reading_time: string;
+  video_url?: string;
+  is_featured?: boolean;
+  is_published: boolean;
+  views_count: number;
+  created_at: string;
+}
+
+export interface ReleaseNote {
+  id: string;
+  version: string;
+  date: string;
+  title: string;
+  features: string[];
+  improvements: string[];
+  fixes: string[];
+}
+
+export type SellerLoadStatus = 'em_viagem' | 'fechada' | 'cancelada';
+
+export interface SellerLoadItem {
+  product_id: string;
+  product_name: string;
+  unit: string;
+  unit_price: number;
+  cost_price: number;
+  initial_qty: number;         // Quantidade enviada
+  sold_qty: number;            // Quantidade vendida
+  counted_qty?: number;        // Quantidade contada na devolução
+  expected_return_qty?: number; // initial_qty - sold_qty
+  diff_qty?: number;           // counted_qty - expected_return_qty
+}
+
+export interface SellerLoadSale {
+  sale_id: string;
+  type: 'pdv' | 'fiado' | 'venda_rapida';
+  date: string;
+  customer_name?: string;
+  total_amount: number;
+  payment_method: PaymentMethod | string;
+  items: {
+    product_id: string;
+    product_name: string;
+    quantity: number;
+    unit: string;
+    unit_price: number;
+    total_price: number;
+  }[];
+}
+
+export interface Driver {
+  id: string;
+  name: string;
+  phone?: string;
+  license_number?: string; // CNH / Documento
+  vehicle?: string;        // Placa ou veículo principal
+  status?: 'active' | 'inactive';
+  created_at?: string;
+}
+
+export interface SellerLoad {
+  id: string;
+  code: string; // ex: "CRG-1001"
+  company_id?: string;
+  vendor_id?: string;
+  vendor_name: string;
+  driver_id?: string;
+  driver_name?: string;
+  vehicle?: string;
+  departure_date: string;
+  closed_at?: string;
+  status: SellerLoadStatus;
+  notes?: string;
+
+  items: SellerLoadItem[];
+  sales?: SellerLoadSale[];
+
+  // Conferência Financeira
+  expected_financial?: {
+    total_sold: number;
+    dinheiro: number;
+    pix: number;
+    cartao: number;
+    fiado: number;
+  };
+  actual_financial?: {
+    dinheiro: number;
+    pix: number;
+    cartao: number;
+    fiado: number;
+  };
+  financial_diff?: number;
+
+  created_at: string;
+  updated_at?: string;
 }
 
 

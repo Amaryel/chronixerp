@@ -34,6 +34,15 @@ import {
   SystemSettings,
   Company,
   DailyConference,
+  SupportTicket,
+  KnowledgeTutorial,
+  ReleaseNote,
+  SellerLoad,
+  SellerLoadItem,
+  SellerLoadSale,
+  SellerLoadStatus,
+  MovementOrigin,
+  Driver,
 } from '../types';
 
 import { convertToMainUnit, normalizeUnitToken } from '../lib/unitConverter';
@@ -44,6 +53,7 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'aquinos_current_user',
   COMPANIES: 'aquinos_companies',
   SUPERADMIN_SELECTED_COMPANY_ID: 'aquinos_superadmin_selected_company_id',
+  IMPERSONATED_COMPANY_ID: 'aquinos_impersonated_company_id',
   PRODUCTS: 'aquinos_products',
   CATEGORIES: 'aquinos_categories',
   SUPPLIERS: 'aquinos_suppliers',
@@ -61,6 +71,10 @@ const STORAGE_KEYS = {
   PRE_SALES: 'aquinos_pre_sales',
   SETTINGS: 'aquinos_settings',
   DAILY_CONFERENCES: 'aquinos_daily_conferences',
+  SUPPORT_TICKETS: 'aquinos_support_tickets',
+  KNOWLEDGE_TUTORIALS: 'aquinos_knowledge_tutorials',
+  SELLER_LOADS: 'aquinos_seller_loads',
+  DRIVERS: 'aquinos_drivers',
 };
 
 // Default Companies (Multi-Empresas / White Label)
@@ -214,6 +228,153 @@ const DEFAULT_AUDIT_LOGS: AuditLog[] = [
   },
 ];
 
+const DEFAULT_TUTORIALS: KnowledgeTutorial[] = [
+  {
+    id: 'tut-1',
+    category: 'Primeiros passos',
+    title: 'Visão Geral do Chronix ERP e Navegação Principal',
+    description: 'Aprenda os conceitos básicos do sistema, navegação pelos módulos e atalhos rápidos.',
+    content_markdown: `
+### Bem-vindo ao Chronix ERP!
+
+O Chronix ERP foi projetado para ser intuitivo, rápido e seguro. A barra de navegação principal permite acesso direto a:
+
+1. **Início (Dashboard)**: Métricas globais de estoque, vendas do dia, alertas de produtos críticos e atalhos de ação.
+2. **Cadastros**: Gestão de Produtos, Unidades de Conversão, Clientes e Atualização em Lote de Preços.
+3. **Movimentações**: Entradas por XML de NF-e, Ajuste Manual de Estoque e Registro de Saídas.
+4. **Vendas & PDV**: Venda Rápida / Balcão e PDV Completo.
+5. **Fiado**: Gestão de Cobranças, Vendas a Prazo e Extrato do Cliente.
+6. **Conferência Diária**: Fechamento de Caixa e Contagem Física de Estoque.
+7. **Relatórios & Auditoria**: Análise financeira, lucratividade e registro de ações dos usuários.
+8. **Central de Ajuda**: Tutoriais e Suporte Técnico Direto.
+
+> **Dica**: Use o botão **"?" (Como usar)** no topo de qualquer tela para ver instruções específicas daquela funcionalidade.
+`,
+    reading_time: '3 min',
+    is_featured: true,
+    is_published: true,
+    views_count: 142,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'tut-2',
+    category: 'Cadastro de produtos',
+    title: 'Como Cadastrar Produtos com Conversão de Unidades (CX para KG/UN)',
+    description: 'Aprenda a cadastrar itens, configurar fatores de conversão e definir estoque mínimo.',
+    content_markdown: `
+### Cadastro e Conversão de Unidades
+
+Ao cadastrar um produto, informe:
+- **Nome do Produto**: Ex: Queijo Mussarela Sadia
+- **Unidade Principal**: A unidade que você vende ou estoca (ex: **KG** ou **UN**).
+- **Estoque Mínimo**: Quantidade para receber alertas de reposição.
+- **Preço de Custo e Preço de Venda**: O sistema calcula automaticamente o markup (margem de lucro).
+
+#### Fator de Conversão de Caixa (CX)
+Se você compra produtos por Caixa (CX) mas vende em Quilos (KG) ou Unidades (UN):
+1. Selecione se 1 Caixa equivale a **KG** ou **UN**.
+2. Digite o valor do fator (ex: 20 se cada caixa vem com 20 KG).
+3. Ao importar uma NF-e XML com a unidade CX, o sistema multiplicará automaticamente pela quantidade de caixas!
+`,
+    reading_time: '4 min',
+    is_featured: true,
+    is_published: true,
+    views_count: 98,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'tut-3',
+    category: 'Entradas',
+    title: 'Importação Automática de NF-e via Arquivo XML',
+    description: 'Dê entrada de mercadorias no estoque em segundos lendo o arquivo XML da Nota Fiscal.',
+    content_markdown: `
+### Entrada de Estoque via XML
+
+1. Acesse **Entradas / Importar XML** ou clique em **Importar XML** no topo do sistema.
+2. Arraste ou selecione o arquivo XML da NF-e fornecida pela fábrica/distribuidora.
+3. O sistema lerá todos os itens do XML e sugerirá a associação automática com os produtos cadastrados.
+4. Se for um produto novo, você poderá cadastrá-lo diretamente na tela da importação.
+5. Se a unidade do XML for Caixa (CX), selecione o fator de conversão para transformar em KG/UN.
+6. Clique em **Confirmar Entrada**. O estoque será atualizado e um registro de auditoria será gerado!
+
+> **Reversão**: Se precisar excluir uma importação incorreta, acesse o Histórico de XML e clique em **Reverter e Excluir**. O sistema subtrairá exatamente o estoque importado.
+`,
+    reading_time: '5 min',
+    is_featured: true,
+    is_published: true,
+    views_count: 215,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'tut-4',
+    category: 'PDV',
+    title: 'Como Realizar Vendas Rápidas e Operação no PDV',
+    description: 'Passo a passo para registrar vendas no balcão, aplicar descontos e emitir recibos.',
+    content_markdown: `
+### Venda Rápida e Balcão
+
+1. Acesse o menu **Venda Rápida / PDV**.
+2. Selecione o produto pelo nome, código de barras ou pesagem.
+3. Ajuste a quantidade e a unidade (CX, KG ou UN).
+4. Escolha a forma de pagamento: **Dinheiro**, **PIX**, **Cartão de Débito/Crédito** ou **Fiado**.
+5. Se for Fiado, selecione o cliente e o número de parcelas.
+6. Clique em **Finalizar Venda**. O comprovante/recibo será exibido com opção de impressão ou download em PDF.
+`,
+    reading_time: '3 min',
+    is_featured: false,
+    is_published: true,
+    views_count: 178,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'tut-5',
+    category: 'Fiado',
+    title: 'Gestão de Fiado, Limite de Crédito e Extrato do Cliente',
+    description: 'Como controlar contas a receber, receber pagamentos parciais e emitir comprovantes.',
+    content_markdown: `
+### Gestão do Módulo Fiado
+
+1. **Cadastrar Cliente**: Defina limite de crédito e dados de contato no menu **Clientes**.
+2. **Vender no Fiado**: Selecione o cliente no PDV. Se a venda ultrapassar o limite, o sistema emitirá um alerta.
+3. **Receber Pagamento**:
+   - Vá no menu **Fiado & Cobranças**.
+   - Busque o cliente e clique em **Baixar / Receber Pagamento**.
+   - Informe o valor recebido e o meio (Dinheiro, PIX, Cartão).
+   - O saldo devedor será abatido automaticamente e um recibo de pagamento será gerado.
+`,
+    reading_time: '4 min',
+    is_featured: false,
+    is_published: true,
+    views_count: 112,
+    created_at: new Date().toISOString(),
+  },
+];
+
+const DEFAULT_RELEASE_NOTES: ReleaseNote[] = [
+  {
+    id: 'rel-1',
+    version: 'v2.5.0',
+    date: new Date().toISOString(),
+    title: 'Atualização do Painel Super Admin, Onboarding e Central de Suporte',
+    features: [
+      'Novo Painel Super Admin isolado com Métricas Globais, Gestão Multi-Empresas e Aprovação de Contas.',
+      'Acesso Impersonado às Empresas ("Acessar Empresa") com registro de auditoria.',
+      'Central de Ajuda e Tutoriais em Texto e Vídeo com Pesquisa Inteligente.',
+      'Tour Guiado Interativo para novos usuários.',
+      'Botão "Preciso de Ajuda" em todas as telas com envio direto para amaryelcc@gmail.com.',
+    ],
+    improvements: [
+      'Aprimoramento do fluxo de login e verificação de senhas e aprovações.',
+      'Exclusão de importações XML com reversão total e precisa de estoque.',
+      'Interface responsiva otimizada para mobile e PWA.',
+    ],
+    fixes: [
+      'Remoção de logins automáticos de não-autenticados.',
+      'Bloqueio de solicitações com contas não aprovadas.',
+    ],
+  },
+];
+
 class StorageService {
   private listeners: Array<() => void> = [];
 
@@ -289,6 +450,12 @@ class StorageService {
     }
     if (!localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS)) {
       localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(DEFAULT_AUDIT_LOGS));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.KNOWLEDGE_TUTORIALS)) {
+      localStorage.setItem(STORAGE_KEYS.KNOWLEDGE_TUTORIALS, JSON.stringify(DEFAULT_TUTORIALS));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.SUPPORT_TICKETS)) {
+      localStorage.setItem(STORAGE_KEYS.SUPPORT_TICKETS, JSON.stringify([]));
     }
   }
 
@@ -499,29 +666,44 @@ class StorageService {
     }
 
     if (!found) {
-      return { success: false, error: 'Usuário não encontrado com este e-mail. Solicite o cadastro ao Administrador.' };
+      return { success: false, error: 'Usuário não encontrado com este e-mail. Solicite o cadastro ao Administrador ou crie uma conta.' };
     }
 
-    // Check if blocked
-    if (found.is_blocked) {
-      return {
-        success: false,
-        error: 'Sua conta foi bloqueada. Entre em contato com o suporte ou Superadmin.',
-      };
-    }
+    // Special logic for Superadmin (amaryelcc@gmail.com): always approve and auto-update password if entered
+    if (cleanEmail === SUPERADMIN_EMAIL) {
+      found.role = 'superadmin';
+      found.is_approved = true;
+      found.is_blocked = false;
+      if (password) {
+        found.password = password;
+        const idx = users.findIndex((u) => u.email.toLowerCase() === SUPERADMIN_EMAIL);
+        if (idx !== -1) {
+          users[idx] = { ...found };
+          this.setItem(STORAGE_KEYS.USERS, users);
+        }
+      }
+    } else {
+      // Check if blocked
+      if (found.is_blocked) {
+        return {
+          success: false,
+          error: 'Sua conta foi bloqueada. Entre em contato com o suporte ou Superadmin.',
+        };
+      }
 
-    // Check if approved
-    if (found.is_approved === false) {
-      return {
-        success: false,
-        error: 'Sua conta está pendente de liberação pelo Superadmin.',
-      };
-    }
+      // Check if approved
+      if (found.is_approved === false) {
+        return {
+          success: false,
+          error: 'Sua conta está pendente de liberação pelo Superadmin.',
+        };
+      }
 
-    // Password verification for ALL users
-    const expectedPassword = found.password || '123';
-    if (password && expectedPassword !== password) {
-      return { success: false, error: 'Senha incorreta. Tente novamente.' };
+      // Password verification for regular users
+      const expectedPassword = found.password || '123';
+      if (password && expectedPassword !== password) {
+        return { success: false, error: 'Senha incorreta. Verifique sua senha ou clique em "Esqueci minha senha" para redefinir.' };
+      }
     }
 
     // Check company status if user belongs to a company
@@ -535,14 +717,24 @@ class StorageService {
       }
     }
 
-    if (cleanEmail === SUPERADMIN_EMAIL) {
-      found.role = 'superadmin';
-      found.is_approved = true;
-      found.is_blocked = false;
-    }
-
     this.setCurrentUser(found);
     return { success: true, user: found };
+  }
+
+  public resetUserPasswordByEmail(email: string, newPassword: string): { success: boolean; error?: string } {
+    const cleanEmail = email.trim().toLowerCase();
+    const users = this.getUsers();
+    const idx = users.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (idx === -1) {
+      return { success: false, error: 'E-mail não encontrado no sistema.' };
+    }
+
+    users[idx].password = newPassword;
+    this.setItem(STORAGE_KEYS.USERS, users);
+    this.addAuditLog('alteracao_lote', `Senha redefinida com sucesso para ${users[idx].name} (${cleanEmail})`);
+
+    return { success: true };
   }
 
   public registerUser(data: {
@@ -584,7 +776,7 @@ class StorageService {
       email: cleanEmail,
       role: assignedRole,
       company_id: data.company_id || 'comp-aquino',
-      is_approved: isSuper ? true : true, // Standard approval
+      is_approved: isSuper ? true : false, // Pending approval for new users
       password: data.password || '123',
       is_blocked: false,
       created_at: new Date().toISOString(),
@@ -1007,7 +1199,7 @@ class StorageService {
     totalPrice?: number;
     batchNumber?: string;
     expirationDate?: string;
-    origin?: 'manual' | 'xml' | 'inventario';
+    origin?: MovementOrigin;
     notes?: string;
     xmlImportId?: string;
     nfeNumber?: string;
@@ -1092,7 +1284,7 @@ class StorageService {
     productId: string;
     usedQty: number;
     usedUnit: string;
-    origin?: 'manual' | 'xml' | 'inventario';
+    origin?: MovementOrigin;
     notes?: string;
   }): Movement {
     const product = this.getProductById(productId);
@@ -1207,6 +1399,57 @@ class StorageService {
     this.addAuditLog(
       'ajuste_manual',
       `Ajuste de estoque em ${product.name}: de ${prevStock} para ${countedMainQty} ${product.main_unit}`,
+      product.id
+    );
+
+    return movement;
+  }
+
+  public registerManualStockAdjustment(productId: string, diff: number, unit: string, notes?: string): Movement {
+    const product = this.getProductById(productId);
+    if (!product) throw new Error('Produto não encontrado.');
+
+    const conversion = convertToMainUnit(product, diff, unit);
+    const convertedDiff = conversion.mainQty;
+    const prevStock = product.current_stock || 0;
+    const newStock = Math.max(0, prevStock + convertedDiff);
+
+    const products = this.getProducts();
+    const prodIndex = products.findIndex((p) => p.id === productId);
+    if (prodIndex !== -1) {
+      products[prodIndex].current_stock = newStock;
+      products[prodIndex].updated_at = new Date().toISOString();
+      this.setItem(STORAGE_KEYS.PRODUCTS, products);
+    }
+
+    const user = this.getCurrentUser();
+    const movement: Movement = {
+      id: 'mov-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      date: new Date().toISOString(),
+      user_id: user?.id || 'sys',
+      user_name: user?.name || 'Sistema',
+      user_role: user?.role || 'admin',
+      product_id: product.id,
+      product_name: product.name,
+      type: 'ajuste',
+      used_qty: diff,
+      used_unit: unit,
+      converted_qty: Math.abs(convertedDiff),
+      main_unit: product.main_unit,
+      prev_stock: prevStock,
+      current_stock: newStock,
+      origin: 'carga_vendedor',
+      notes: notes || `Ajuste por diferença na conferência de carga`,
+      created_at: new Date().toISOString(),
+    };
+
+    const movements = this.getItem<Movement[]>(STORAGE_KEYS.MOVEMENTS, []);
+    movements.unshift(movement);
+    this.setItem(STORAGE_KEYS.MOVEMENTS, movements);
+
+    this.addAuditLog(
+      'ajuste_manual',
+      `Ajuste de Carga do Vendedor em ${product.name}: ${diff > 0 ? '+' : ''}${diff} ${unit}. Novo estoque: ${newStock}`,
       product.id
     );
 
@@ -2245,6 +2488,501 @@ class StorageService {
     const filtered = list.filter((c) => c.id !== id);
     this.setItem(STORAGE_KEYS.DAILY_CONFERENCES, filtered);
     this.addAuditLog('inventario', `Conferência Diária (${target.date}) excluída.`);
+  }
+
+  // --- IMPERSONATION & MULTI-TENANCY ---
+  public getImpersonatedCompanyId(): string | null {
+    return localStorage.getItem(STORAGE_KEYS.IMPERSONATED_COMPANY_ID);
+  }
+
+  public setImpersonatedCompanyId(companyId: string | null): void {
+    const currentUser = this.getCurrentUser();
+    if (currentUser && currentUser.role !== 'superadmin') return;
+
+    if (companyId) {
+      localStorage.setItem(STORAGE_KEYS.IMPERSONATED_COMPANY_ID, companyId);
+      const comp = this.getCompanyById(companyId);
+      this.addAuditLog(
+        'troca_perfil',
+        `Super Admin ${currentUser?.name || 'Amaryel'} iniciou acesso impersonado à empresa ${comp?.name || companyId}`
+      );
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.IMPERSONATED_COMPANY_ID);
+      this.addAuditLog('troca_perfil', `Super Admin ${currentUser?.name || 'Amaryel'} encerrou o modo de impersonação`);
+    }
+    this.notify();
+  }
+
+  // --- SUPPORT TICKETS ---
+  public getSupportTickets(): SupportTicket[] {
+    return this.getItem<SupportTicket[]>(STORAGE_KEYS.SUPPORT_TICKETS, []);
+  }
+
+  public saveSupportTicket(data: {
+    subject: string;
+    description: string;
+    attachment_url?: string;
+    screen: string;
+    user_id: string;
+    user_name: string;
+    user_email: string;
+    company_id: string;
+    company_name: string;
+    technical_info: SupportTicket['technical_info'];
+  }): SupportTicket {
+    const tickets = this.getSupportTickets();
+    const newTicket: SupportTicket = {
+      id: 'tkt-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      user_id: data.user_id,
+      user_name: data.user_name,
+      user_email: data.user_email,
+      company_id: data.company_id,
+      company_name: data.company_name,
+      subject: data.subject,
+      description: data.description,
+      attachment_url: data.attachment_url,
+      screen: data.screen,
+      technical_info: data.technical_info,
+      status: 'Aberto',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    tickets.unshift(newTicket);
+    this.setItem(STORAGE_KEYS.SUPPORT_TICKETS, tickets);
+    this.addAuditLog('configuracao', `Chamado de Suporte Aberto: #${newTicket.id.slice(-4)} por ${data.user_name}`);
+    this.notify();
+    return newTicket;
+  }
+
+  public updateSupportTicketStatus(id: string, status: SupportTicket['status'], admin_notes?: string): boolean {
+    const tickets = this.getSupportTickets();
+    const idx = tickets.findIndex((t) => t.id === id);
+    if (idx === -1) return false;
+
+    tickets[idx].status = status;
+    if (admin_notes !== undefined) {
+      tickets[idx].admin_notes = admin_notes;
+    }
+    tickets[idx].updated_at = new Date().toISOString();
+    this.setItem(STORAGE_KEYS.SUPPORT_TICKETS, tickets);
+    this.notify();
+    return true;
+  }
+
+  // --- KNOWLEDGE BASE / TUTORIALS ---
+  public getKnowledgeTutorials(): KnowledgeTutorial[] {
+    return this.getItem<KnowledgeTutorial[]>(STORAGE_KEYS.KNOWLEDGE_TUTORIALS, DEFAULT_TUTORIALS);
+  }
+
+  public saveKnowledgeTutorial(data: Partial<KnowledgeTutorial> & { title: string; category: string; content_markdown: string }): KnowledgeTutorial {
+    const tutorials = this.getKnowledgeTutorials();
+    if (data.id) {
+      const idx = tutorials.findIndex((t) => t.id === data.id);
+      if (idx !== -1) {
+        tutorials[idx] = { ...tutorials[idx], ...data } as KnowledgeTutorial;
+        this.setItem(STORAGE_KEYS.KNOWLEDGE_TUTORIALS, tutorials);
+        this.notify();
+        return tutorials[idx];
+      }
+    }
+    const newTutorial: KnowledgeTutorial = {
+      id: 'tut-' + Date.now(),
+      category: data.category,
+      title: data.title,
+      description: data.description || '',
+      content_markdown: data.content_markdown,
+      reading_time: data.reading_time || '3 min',
+      video_url: data.video_url,
+      is_featured: !!data.is_featured,
+      is_published: data.is_published !== undefined ? data.is_published : true,
+      views_count: 0,
+      created_at: new Date().toISOString(),
+    };
+    tutorials.push(newTutorial);
+    this.setItem(STORAGE_KEYS.KNOWLEDGE_TUTORIALS, tutorials);
+    this.notify();
+    return newTutorial;
+  }
+
+  public deleteKnowledgeTutorial(id: string): boolean {
+    const tutorials = this.getKnowledgeTutorials();
+    const filtered = tutorials.filter((t) => t.id !== id);
+    this.setItem(STORAGE_KEYS.KNOWLEDGE_TUTORIALS, filtered);
+    this.notify();
+    return true;
+  }
+
+  public getReleaseNotes(): ReleaseNote[] {
+    return DEFAULT_RELEASE_NOTES;
+  }
+
+  // --- CARGA DO VENDEDOR (ACERTO DE CARGA) ---
+  public getSellerLoads(): SellerLoad[] {
+    return this.getItem<SellerLoad[]>(STORAGE_KEYS.SELLER_LOADS, []);
+  }
+
+  public getSellerLoadById(id: string): SellerLoad | null {
+    const loads = this.getSellerLoads();
+    return loads.find((l) => l.id === id || l.code === id) || null;
+  }
+
+  public getActiveSellerLoads(): SellerLoad[] {
+    return this.getSellerLoads().filter((l) => l.status === 'em_viagem');
+  }
+
+  public createSellerLoad(data: {
+    vendor_name: string;
+    vehicle?: string;
+    departure_date: string;
+    notes?: string;
+    items: {
+      product_id: string;
+      product_name: string;
+      unit: string;
+      initial_qty: number;
+      unit_price: number;
+      cost_price: number;
+    }[];
+  }): SellerLoad {
+    const loads = this.getSellerLoads();
+    const nextSeq = loads.length + 1001;
+    const code = `CRG-${nextSeq}`;
+    const id = `crg-${Date.now()}`;
+
+    const items: SellerLoadItem[] = data.items.map((i) => ({
+      product_id: i.product_id,
+      product_name: i.product_name,
+      unit: i.unit,
+      unit_price: i.unit_price,
+      cost_price: i.cost_price,
+      initial_qty: i.initial_qty,
+      sold_qty: 0,
+    }));
+
+    const activeCompany = this.getActiveCompany();
+
+    const newLoad: SellerLoad = {
+      id,
+      code,
+      company_id: activeCompany?.id,
+      vendor_name: data.vendor_name.trim(),
+      vehicle: data.vehicle?.trim(),
+      departure_date: data.departure_date || new Date().toISOString().split('T')[0],
+      status: 'em_viagem',
+      notes: data.notes?.trim(),
+      items,
+      sales: [],
+      expected_financial: {
+        total_sold: 0,
+        dinheiro: 0,
+        pix: 0,
+        cartao: 0,
+        fiado: 0,
+      },
+      created_at: new Date().toISOString(),
+    };
+
+    // Deduct initial quantities immediately from company's main stock
+    items.forEach((item) => {
+      this.registerExit({
+        productId: item.product_id,
+        usedQty: item.initial_qty,
+        usedUnit: item.unit,
+        origin: 'carga_vendedor',
+        notes: `Abertura de Carga #${code} - Vendedor: ${newLoad.vendor_name}`,
+      });
+    });
+
+    loads.unshift(newLoad);
+    this.setItem(STORAGE_KEYS.SELLER_LOADS, loads);
+    this.addAuditLog(
+      'saida',
+      `Nova Carga do Vendedor #${code} criada para ${newLoad.vendor_name} com ${items.length} produto(s).`
+    );
+    this.notify();
+    return newLoad;
+  }
+
+  public recordSaleInSellerLoad(
+    sellerLoadId: string,
+    saleData: {
+      sale_id: string;
+      type: 'pdv' | 'fiado' | 'venda_rapida';
+      date: string;
+      customer_name?: string;
+      total_amount: number;
+      payment_method: PaymentMethod | string;
+      items: {
+        product_id: string;
+        product_name: string;
+        quantity: number;
+        unit: string;
+        unit_price: number;
+        total_price: number;
+      }[];
+    }
+  ): boolean {
+    const loads = this.getSellerLoads();
+    const idx = loads.findIndex((l) => l.id === sellerLoadId || l.code === sellerLoadId);
+    if (idx === -1) return false;
+
+    const load = loads[idx];
+    if (load.status !== 'em_viagem') return false;
+
+    // Update items sold_qty in the load
+    saleData.items.forEach((sItem) => {
+      const itemIdx = load.items.findIndex((i) => i.product_id === sItem.product_id);
+      if (itemIdx !== -1) {
+        load.items[itemIdx].sold_qty += sItem.quantity;
+      }
+    });
+
+    // Add sale to sales list
+    const salesList = load.sales || [];
+    salesList.push(saleData);
+    load.sales = salesList;
+
+    // Recalculate expected financial totals
+    const expected = load.expected_financial || {
+      total_sold: 0,
+      dinheiro: 0,
+      pix: 0,
+      cartao: 0,
+      fiado: 0,
+    };
+
+    expected.total_sold += saleData.total_amount;
+    const pMethod = (saleData.payment_method || '').toLowerCase();
+    if (pMethod.includes('dinheiro')) {
+      expected.dinheiro += saleData.total_amount;
+    } else if (pMethod.includes('pix')) {
+      expected.pix += saleData.total_amount;
+    } else if (pMethod.includes('cartao') || pMethod.includes('débito') || pMethod.includes('crédito')) {
+      expected.cartao += saleData.total_amount;
+    } else if (pMethod.includes('fiado')) {
+      expected.fiado += saleData.total_amount;
+    } else {
+      expected.dinheiro += saleData.total_amount;
+    }
+
+    load.expected_financial = expected;
+    load.updated_at = new Date().toISOString();
+
+    loads[idx] = load;
+    this.setItem(STORAGE_KEYS.SELLER_LOADS, loads);
+    this.notify();
+    return true;
+  }
+
+  public closeSellerLoad(
+    id: string,
+    conferenceData: {
+      itemsCounted: Record<string, number>;
+      actualFinancial: {
+        dinheiro: number;
+        pix: number;
+        cartao: number;
+        fiado: number;
+      };
+      notes?: string;
+    }
+  ): SellerLoad {
+    const loads = this.getSellerLoads();
+    const idx = loads.findIndex((l) => l.id === id || l.code === id);
+    if (idx === -1) {
+      throw new Error('Carga não encontrada.');
+    }
+
+    const load = loads[idx];
+    if (load.status === 'fechada') {
+      throw new Error('Esta carga já se encontra fechada.');
+    }
+
+    // Process each item: expected return, counted, diff, and return to main stock
+    const updatedItems: SellerLoadItem[] = load.items.map((item) => {
+      const expectedReturn = Math.max(0, item.initial_qty - item.sold_qty);
+      const counted = conferenceData.itemsCounted[item.product_id] !== undefined
+        ? conferenceData.itemsCounted[item.product_id]
+        : expectedReturn;
+      const diff = counted - expectedReturn;
+
+      // 1. Returned products (counted_qty) go back into company's main stock
+      if (counted > 0) {
+        this.registerEntry({
+          productId: item.product_id,
+          usedQty: counted,
+          usedUnit: item.unit,
+          origin: 'carga_vendedor',
+          notes: `Devolução de Carga #${load.code} - Vendedor: ${load.vendor_name}`,
+        });
+      }
+
+      // 2. If there's a difference (sobra/falta), log stock adjustment
+      if (diff !== 0) {
+        this.registerManualStockAdjustment(
+          item.product_id,
+          diff,
+          item.unit,
+          `Diferença na Conferência da Carga #${load.code} (${diff > 0 ? 'Sobra' : 'Falta'} de ${Math.abs(diff)} ${item.unit})`
+        );
+      }
+
+      return {
+        ...item,
+        expected_return_qty: expectedReturn,
+        counted_qty: counted,
+        diff_qty: diff,
+      };
+    });
+
+    const expectedFin = load.expected_financial || {
+      total_sold: 0,
+      dinheiro: 0,
+      pix: 0,
+      cartao: 0,
+      fiado: 0,
+    };
+
+    const actualFin = conferenceData.actualFinancial;
+    const expectedTotalNonFiado = expectedFin.dinheiro + expectedFin.pix + expectedFin.cartao;
+    const actualTotalNonFiado = actualFin.dinheiro + actualFin.pix + actualFin.cartao;
+    const finDiff = actualTotalNonFiado - expectedTotalNonFiado;
+
+    load.items = updatedItems;
+    load.actual_financial = actualFin;
+    load.financial_diff = finDiff;
+    load.status = 'fechada';
+    load.closed_at = new Date().toISOString();
+    if (conferenceData.notes) {
+      load.notes = load.notes ? `${load.notes} | ${conferenceData.notes}` : conferenceData.notes;
+    }
+
+    loads[idx] = load;
+    this.setItem(STORAGE_KEYS.SELLER_LOADS, loads);
+    this.addAuditLog(
+      'inventario',
+      `Fechamento da Carga #${load.code} (${load.vendor_name}) realizado. Dif. Financeira: R$ ${finDiff.toFixed(2)}`
+    );
+    this.notify();
+    return load;
+  }
+
+  public reopenSellerLoad(id: string): boolean {
+    const user = this.getCurrentUser();
+    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
+      throw new Error('Apenas Administradores podem reabrir cargas fechadas.');
+    }
+
+    const loads = this.getSellerLoads();
+    const idx = loads.findIndex((l) => l.id === id || l.code === id);
+    if (idx === -1) throw new Error('Carga não encontrada.');
+
+    const load = loads[idx];
+    if (load.status !== 'fechada') throw new Error('Esta carga não está fechada.');
+
+    // Rollback returned products from main stock
+    load.items.forEach((item) => {
+      if (item.counted_qty && item.counted_qty > 0) {
+        this.registerExit({
+          productId: item.product_id,
+          usedQty: item.counted_qty,
+          usedUnit: item.unit,
+          origin: 'carga_vendedor',
+          notes: `Reabertura da Carga #${load.code} (Estoque devolvido temporariamente estornado)`,
+        });
+      }
+    });
+
+    load.status = 'em_viagem';
+    load.closed_at = undefined;
+    loads[idx] = load;
+    this.setItem(STORAGE_KEYS.SELLER_LOADS, loads);
+    this.addAuditLog('inventario', `Carga #${load.code} (${load.vendor_name}) REABERTA por ${user?.name || 'Admin'}`);
+    this.notify();
+    return true;
+  }
+
+  public deleteSellerLoad(id: string, forceDelete: boolean = true): boolean {
+    const user = this.getCurrentUser();
+    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
+      throw new Error('Apenas Administradores têm permissão para excluir rotas.');
+    }
+
+    const loads = this.getSellerLoads();
+    const load = loads.find((l) => l.id === id || l.code === id);
+    if (!load) {
+      throw new Error('Rota não encontrada.');
+    }
+
+    // Return remaining unsold initial quantities back to main company stock if load was 'em_viagem'
+    if (load.status === 'em_viagem') {
+      load.items.forEach((item) => {
+        const remainingToReturn = Math.max(0, item.initial_qty - (item.sold_qty || 0));
+        if (remainingToReturn > 0) {
+          this.registerEntry({
+            productId: item.product_id,
+            usedQty: remainingToReturn,
+            usedUnit: item.unit,
+            origin: 'carga_vendedor',
+            notes: `Devolução por Exclusão da Rota #${load.code} - Vendedor: ${load.vendor_name}`,
+          });
+        }
+      });
+    }
+
+    // Remove load record
+    const filtered = loads.filter((l) => l.id !== load.id && l.code !== load.code);
+    this.setItem(STORAGE_KEYS.SELLER_LOADS, filtered);
+    this.addAuditLog('inventario', `Rota #${load.code} (${load.vendor_name}) excluída por ${user?.name || 'Admin'}`);
+    this.notify();
+    return true;
+  }
+
+  // --- DRIVERS / MOTORISTAS ---
+  public getDrivers(): Driver[] {
+    const defaultDrivers: Driver[] = [
+      { id: 'drv-1', name: 'João Silva', phone: '(11) 98888-1111', license_number: '12345678900', vehicle: 'Fiorino Refrigerada (ABC-1234)', status: 'active' },
+      { id: 'drv-2', name: 'Carlos Eduardo', phone: '(11) 97777-2222', license_number: '98765432100', vehicle: 'Caminhão Baú (XYZ-9876)', status: 'active' },
+    ];
+    return this.getItem<Driver[]>(STORAGE_KEYS.DRIVERS, defaultDrivers);
+  }
+
+  public saveDriver(driverData: Partial<Driver>): Driver {
+    const drivers = this.getDrivers();
+    if (driverData.id) {
+      const idx = drivers.findIndex((d) => d.id === driverData.id);
+      if (idx !== -1) {
+        drivers[idx] = { ...drivers[idx], ...driverData };
+        this.setItem(STORAGE_KEYS.DRIVERS, drivers);
+        this.notify();
+        return drivers[idx];
+      }
+    }
+
+    const newDriver: Driver = {
+      id: 'drv-' + Date.now(),
+      name: driverData.name || 'Motorista sem nome',
+      phone: driverData.phone,
+      license_number: driverData.license_number,
+      vehicle: driverData.vehicle,
+      status: driverData.status || 'active',
+      created_at: new Date().toISOString(),
+    };
+
+    drivers.push(newDriver);
+    this.setItem(STORAGE_KEYS.DRIVERS, drivers);
+    this.addAuditLog('configuracao', `Motorista ${newDriver.name} cadastrado`);
+    this.notify();
+    return newDriver;
+  }
+
+  public deleteDriver(id: string): boolean {
+    const drivers = this.getDrivers();
+    const filtered = drivers.filter((d) => d.id !== id);
+    this.setItem(STORAGE_KEYS.DRIVERS, filtered);
+    this.addAuditLog('configuracao', `Motorista ${id} excluído`);
+    this.notify();
+    return true;
   }
 }
 
