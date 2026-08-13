@@ -16,6 +16,9 @@ export const OperationalPreferences: React.FC<OperationalPreferencesProps> = ({ 
   const [fiadoInterestRate, setFiadoInterestRate] = useState<number | string>(
     currentSettings.fiado_interest_rate !== undefined ? currentSettings.fiado_interest_rate : 5
   );
+  const [defaultAllowFractional, setDefaultAllowFractional] = useState<boolean>(
+    currentSettings.default_allow_fractional || false
+  );
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
@@ -27,6 +30,7 @@ export const OperationalPreferences: React.FC<OperationalPreferencesProps> = ({ 
       allow_negative_stock: allowNegativeStock,
       auto_clear_form: autoClearForm,
       fiado_interest_rate: Math.max(0, rateNum),
+      default_allow_fractional: defaultAllowFractional,
     });
 
     setSavedMessage('✓ Configurações salvas e aplicadas com sucesso ao sistema!');
@@ -216,6 +220,68 @@ export const OperationalPreferences: React.FC<OperationalPreferencesProps> = ({ 
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xs">%</span>
             </div>
+          </div>
+        </div>
+
+        {/* 4. REGRA GLOBAL DE VENDA FRACIONADA */}
+        <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 space-y-3">
+          <div className="flex items-center gap-2 text-slate-900 dark:text-white font-extrabold text-sm">
+            <Sliders className="w-5 h-5 text-purple-500" />
+            <span>4. Regra Global para Venda Fracionada</span>
+          </div>
+
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Define o comportamento padrão para vendas fracionadas (ex: 0,5 CX ou 10 KG) quando o produto não possuir uma regra específica. A regra cadastrada individualmente no produto sempre prevalece sobre a regra global.
+          </p>
+
+          <div className="space-y-2.5 pt-1">
+            <label
+              className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition ${
+                !defaultAllowFractional
+                  ? 'bg-white dark:bg-slate-900 border-blue-600 ring-2 ring-blue-500/20 shadow-sm'
+                  : 'bg-white/60 dark:bg-slate-900/60 border-slate-200 dark:border-slate-700 opacity-80'
+              }`}
+            >
+              <input
+                type="radio"
+                name="default_fractional"
+                checked={!defaultAllowFractional}
+                onChange={() => setDefaultAllowFractional(false)}
+                className="mt-1 text-blue-600 focus:ring-blue-500"
+              />
+              <div className="text-xs">
+                <span className="font-extrabold text-slate-900 dark:text-white block">
+                  Não permitir por padrão (Recomendado)
+                </span>
+                <span className="text-slate-500 dark:text-slate-400 block mt-0.5">
+                  Somente produtos explicitamente configurados com "Permitir Venda Fracionada: SIM" poderão ser vendidos em quantidades fracionadas.
+                </span>
+              </div>
+            </label>
+
+            <label
+              className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition ${
+                defaultAllowFractional
+                  ? 'bg-white dark:bg-slate-900 border-purple-500 ring-2 ring-purple-500/20 shadow-sm'
+                  : 'bg-white/60 dark:bg-slate-900/60 border-slate-200 dark:border-slate-700 opacity-80'
+              }`}
+            >
+              <input
+                type="radio"
+                name="default_fractional"
+                checked={defaultAllowFractional}
+                onChange={() => setDefaultAllowFractional(true)}
+                className="mt-1 text-purple-600 focus:ring-purple-500"
+              />
+              <div className="text-xs">
+                <span className="font-extrabold text-slate-900 dark:text-white block">
+                  Permitir venda fracionada por padrão
+                </span>
+                <span className="text-slate-500 dark:text-slate-400 block mt-0.5">
+                  Todos os produtos permitirão vendas em frações, exceto os desativados individualmente no cadastro do produto.
+                </span>
+              </div>
+            </label>
           </div>
         </div>
 

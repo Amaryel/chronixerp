@@ -76,6 +76,70 @@ export async function testSupabaseConnection(url: string, key: string): Promise<
  * Complete SQL Migration script for Supabase Database
  * Users can execute this in their Supabase SQL Editor
  */
+export const SUPABASE_HEARTBEAT_SQL = `-- AQUINOS FRIOS - MANTER SUPABASE ATIVO (HEARTBEAT SERVER-SIDE)
+-- Este script configura uma função agendada que executa automaticamente no PostgreSQL do Supabase,
+-- garantindo que o banco permaneça ativo sem depender de navegação, PWA ou computadores ligados.
+
+-- 1. Habilita a extensão pg_cron (se disponível no seu projeto Supabase)
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- 2. Tabela técnica de monitoramento (isolada e invisível para telas comerciais)
+CREATE TABLE IF NOT EXISTS system_heartbeat (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  last_execution TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT DEFAULT 'active'
+);
+
+-- Habilita RLS para proteção de dados
+ALTER TABLE system_heartbeat ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'system_heartbeat' AND policyname = 'heartbeat_select_policy'
+  ) THEN
+    CREATE POLICY heartbeat_select_policy ON system_heartbeat FOR SELECT USING (true);
+  END IF;
+END $$;
+
+-- 3. Função do servidor que confirma atividade leve sem alterar dados operacionais
+CREATE OR REPLACE FUNCTION keep_supabase_alive()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Atualiza o registro de verificação no sistema (sem alterar estoque, vendas ou usuários)
+  INSERT INTO system_heartbeat (id, last_execution, status)
+  VALUES ('00000000-0000-0000-0000-000000000001'::uuid, NOW(), 'active')
+  ON CONFLICT (id) DO UPDATE
+  SET last_execution = NOW(), status = 'active';
+END;
+$$;
+
+-- 4. Agendamento automático via pg_cron (Rodando 1x por dia às 03:00 UTC)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    -- Remove agendamento antigo se existir
+    PERFORM cron.unschedule('keep-supabase-alive-job')
+    WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'keep-supabase-alive-job');
+
+    -- Agenda execução diária leve
+    PERFORM cron.schedule(
+      'keep-supabase-alive-job',
+      '0 3 * * *',
+      'SELECT keep_supabase_alive();'
+    );
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
+
+-- 5. Executa imediatamente a primeira vez para inicializar o registro
+SELECT keep_supabase_alive();
+`;
+
 export const SUPABASE_SQL_SCHEMA = `-- AQUINOS FRIOS - DATABASE SCHEMA FOR SUPABASE
 
 -- 1. Usuarios
@@ -232,4 +296,23 @@ INSERT INTO categorias (id, name, description, icon) VALUES
 ('cat-congelados', 'Congelados', 'Hamburgueres, batatas e pratos prontos', 'snowflake'),
 ('cat-outros', 'Outros', 'Insumos e embalagens', 'box')
 ON CONFLICT (name) DO NOTHING;
-`;
+
+` + SUPABASE_HEARTBEAT_SQL;
+
+export async function fetchSupabaseHeartbeatStatus(): Promise<{ last_execution: string; status: string } | null> {
+  try {
+    const client = getSupabaseClient();
+    if (!client) return null;
+    const { data, error } = await client
+      .from('system_heartbeat')
+      .select('last_execution, status')
+      .eq('id', '00000000-0000-0000-0000-000000000001')
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+

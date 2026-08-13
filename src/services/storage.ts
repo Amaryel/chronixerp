@@ -2116,6 +2116,24 @@ class StorageService {
       }
     });
 
+    // Fallback if no movements were linked directly, use saved items in xmlImp
+    if (rolledBackCount === 0 && xmlImp.items && Array.isArray(xmlImp.items)) {
+      xmlImp.items.forEach((item) => {
+        const productId = item.matched_product_id || item.suggested_product_id;
+        if (productId) {
+          const prodIndex = products.findIndex((p) => p.id === productId);
+          if (prodIndex !== -1) {
+            const current = products[prodIndex].current_stock || 0;
+            const factor = item.selected_unit_conversion || 1;
+            const qtyToRollback = (item.qCom || 0) * factor;
+            products[prodIndex].current_stock = Math.max(0, current - qtyToRollback);
+            products[prodIndex].updated_at = new Date().toISOString();
+            rolledBackCount++;
+          }
+        }
+      });
+    }
+
     this.setItem(STORAGE_KEYS.PRODUCTS, products);
 
     // Remove movements
@@ -2132,6 +2150,8 @@ class StorageService {
       'exclusao_xml',
       `Excluída entrada XML NFe #${nfeNum} e revertido estoque de ${rolledBackCount} item(ns).`
     );
+
+    this.notify();
 
     return { success: true, rolledBackItems: rolledBackCount };
   }
@@ -2371,6 +2391,7 @@ class StorageService {
       allow_negative_stock: false,
       auto_clear_form: true,
       fiado_interest_rate: 5,
+      default_allow_fractional: false,
     };
     return this.getItem<SystemSettings>(STORAGE_KEYS.SETTINGS, defaultSettings);
   }
@@ -2632,6 +2653,8 @@ class StorageService {
 
   public createSellerLoad(data: {
     vendor_name: string;
+    driver_id?: string;
+    driver_name?: string;
     vehicle?: string;
     departure_date: string;
     notes?: string;
@@ -2666,6 +2689,8 @@ class StorageService {
       code,
       company_id: activeCompany?.id,
       vendor_name: data.vendor_name.trim(),
+      driver_id: data.driver_id,
+      driver_name: data.driver_name?.trim(),
       vehicle: data.vehicle?.trim(),
       departure_date: data.departure_date || new Date().toISOString().split('T')[0],
       status: 'em_viagem',
@@ -2963,8 +2988,11 @@ class StorageService {
       id: 'drv-' + Date.now(),
       name: driverData.name || 'Motorista sem nome',
       phone: driverData.phone,
+      cpf: driverData.cpf,
       license_number: driverData.license_number,
       vehicle: driverData.vehicle,
+      license_plate: driverData.license_plate,
+      notes: driverData.notes,
       status: driverData.status || 'active',
       created_at: new Date().toISOString(),
     };
@@ -2978,9 +3006,24 @@ class StorageService {
 
   public deleteDriver(id: string): boolean {
     const drivers = this.getDrivers();
+    const drv = drivers.find((d) => d.id === id);
+    if (!drv) return false;
+
+    // Check if driver has linked seller loads/routes
+    const loads = this.getSellerLoads();
+    const linkedLoads = loads.filter(
+      (l) => l.driver_id === id || (drv.name && l.driver_name && l.driver_name.toLowerCase() === drv.name.toLowerCase())
+    );
+
+    if (linkedLoads.length > 0) {
+      throw new Error(
+        `O motorista "${drv.name}" possui ${linkedLoads.length} rota(s) vinculada(s) e não pode ser excluído. Altere o status para Inativo em vez de excluir.`
+      );
+    }
+
     const filtered = drivers.filter((d) => d.id !== id);
     this.setItem(STORAGE_KEYS.DRIVERS, filtered);
-    this.addAuditLog('configuracao', `Motorista ${id} excluído`);
+    this.addAuditLog('configuracao', `Motorista ${drv.name} excluído`);
     this.notify();
     return true;
   }

@@ -32,6 +32,24 @@ export const HistoryList: React.FC<HistoryListProps> = ({ movements, onRefresh }
   const [originFilter, setOriginFilter] = useState<'all' | 'manual' | 'xml' | 'inventario'>('all');
 
   const [selectedMovement, setSelectedMovement] = useState<Movement | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
+
+  const handleDeleteMovement = () => {
+    if (!selectedMovement) return;
+    setDeleteError(null);
+    try {
+      storage.deleteMovement(selectedMovement.id);
+      setDeleteSuccess(`✓ Lançamento do produto "${selectedMovement.product_name}" excluído e estoque revertido com sucesso!`);
+      setConfirmDeleteOpen(false);
+      setSelectedMovement(null);
+      setTimeout(() => setDeleteSuccess(null), 5000);
+      onRefresh?.();
+    } catch (err: any) {
+      setDeleteError(err.message || 'Erro ao excluir movimentação.');
+    }
+  };
 
   const filteredMovements = movements.filter((m) => {
     const matchesSearch =
@@ -60,6 +78,16 @@ export const HistoryList: React.FC<HistoryListProps> = ({ movements, onRefresh }
           </p>
         </div>
       </div>
+
+      {/* Notifications */}
+      {deleteSuccess && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/80 dark:border-emerald-800 dark:text-emerald-300 text-xs font-bold shadow-sm flex items-center justify-between">
+          <span>{deleteSuccess}</span>
+          <button onClick={() => setDeleteSuccess(null)} className="text-emerald-600 hover:text-emerald-900 font-bold">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <div className="bg-white dark:bg-slate-800/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
@@ -258,20 +286,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ movements, onRefresh }
               <button
                 type="button"
                 onClick={() => {
-                  if (
-                    confirm(
-                      `Deseja realmente EXCLUIR esta movimentação (${selectedMovement.product_name}) e REVERTER o estoque?`
-                    )
-                  ) {
-                    try {
-                      storage.deleteMovement(selectedMovement.id);
-                      alert('Movimentação excluída e estoque revertido com sucesso!');
-                      setSelectedMovement(null);
-                      onRefresh?.();
-                    } catch (err: any) {
-                      alert(err.message || 'Erro ao excluir movimentação.');
-                    }
-                  }
+                  setConfirmDeleteOpen(true);
                 }}
                 className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl text-xs shadow transition flex items-center gap-1.5"
               >
@@ -284,6 +299,66 @@ export const HistoryList: React.FC<HistoryListProps> = ({ movements, onRefresh }
                 className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs hover:bg-slate-300 dark:hover:bg-slate-600"
               >
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Confirmation Modal for Movement Deletion */}
+      {confirmDeleteOpen && selectedMovement && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-rose-100 text-rose-600 dark:bg-rose-950/80 dark:text-rose-400">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-white text-base">
+                  Excluir Lançamento e Reverter Estoque
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Confirmação irreversível de estorno
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-xs text-slate-700 dark:text-slate-300 space-y-2">
+              <p className="font-medium">
+                Você está prestes a excluir a movimentação do produto:
+              </p>
+              <p className="font-extrabold text-sm text-slate-900 dark:text-white">
+                {selectedMovement.product_name}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Quantidade: <strong className="text-slate-800 dark:text-slate-200">{selectedMovement.used_qty} {selectedMovement.used_unit}</strong> ({selectedMovement.converted_qty} {selectedMovement.main_unit})
+              </p>
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-xl text-amber-800 dark:text-amber-300 text-[11px] font-semibold">
+                ⚠️ O estoque principal deste produto será automaticamente ajustado/revertido para o saldo anterior.
+              </div>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteMovement}
+                className="px-5 py-2.5 rounded-xl text-white font-black text-xs shadow-lg shadow-rose-600/20 bg-rose-600 hover:bg-rose-700 transition flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sim, Excluir e Reverter</span>
               </button>
             </div>
           </div>

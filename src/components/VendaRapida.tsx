@@ -24,7 +24,7 @@ import {
   Truck,
   Building2,
 } from 'lucide-react';
-import { Product, Customer, PaymentMethod, FiadoSaleItem, FiadoSale, PreSale } from '../types';
+import { Product, Customer, PaymentMethod, PaymentDetail, FiadoSaleItem, FiadoSale, PreSale } from '../types';
 import { storage } from '../services/storage';
 import { convertToMainUnit, formatStockDisplay } from '../lib/unitConverter';
 import { ReceiptModal } from './ReceiptModal';
@@ -78,6 +78,11 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
   // Checkout modal
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('dinheiro');
+  const [isSplitPayment, setIsSplitPayment] = useState<boolean>(false);
+  const [splitPayments, setSplitPayments] = useState<Array<{ method: PaymentMethod; amount: number }>>([
+    { method: 'dinheiro', amount: 0 },
+    { method: 'pix', amount: 0 },
+  ]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [installmentsCount, setInstallmentsCount] = useState<number>(1);
   const [firstDueDate, setFirstDueDate] = useState<string>(() => {
@@ -344,9 +349,36 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
       return;
     }
 
-    if (paymentMethod === 'fiado' && !selectedCustomerId) {
-      alert('Selecione o cliente para venda fiada.');
-      return;
+    let finalPayments: PaymentDetail[] = [];
+
+    if (isSplitPayment) {
+      finalPayments = splitPayments.filter((p) => p.amount > 0);
+      if (finalPayments.length === 0) {
+        alert('Informe ao menos uma forma de pagamento com valor.');
+        return;
+      }
+
+      const totalPaid = finalPayments.reduce((sum, p) => sum + p.amount, 0);
+      const hasFiado = finalPayments.some((p) => p.method === 'fiado');
+
+      // Requirement 4 & 5: Validation of Payment & Partial Fiado
+      if (totalPaid < cartGrandTotal && !hasFiado) {
+        alert(
+          `Atenção: O valor recebido (R$ ${totalPaid.toFixed(2)}) é menor que o valor total da venda (R$ ${cartGrandTotal.toFixed(2)}).\n\nPara prosseguir, inclua outra forma de pagamento ou selecione a opção 'Fiado' para registrar o saldo restante para o cliente.`
+        );
+        return;
+      }
+
+      if (hasFiado && !selectedCustomerId) {
+        alert('Para incluir pagamento do tipo Fiado, por favor selecione o Cliente.');
+        return;
+      }
+    } else {
+      if (paymentMethod === 'fiado' && !selectedCustomerId) {
+        alert('Selecione o cliente para venda fiada.');
+        return;
+      }
+      finalPayments = [{ method: paymentMethod, amount: cartGrandTotal }];
     }
 
     if (stockOrigin === 'carga' && !selectedSellerLoadId) {
@@ -386,7 +418,7 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
             usedQty: item.qty,
             usedUnit: item.unit,
             origin: 'manual',
-            notes: `Venda Rápida (${paymentMethod.toUpperCase()})`,
+            notes: `Venda Rápida (${finalPayments.map((p) => p.method.toUpperCase()).join('/')})`,
           });
         }
 
@@ -406,10 +438,12 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
 
       // 2. Record Sale / Fiado Debt
       const customer = customers.find((c) => c.id === selectedCustomerId);
+      const isFiadoPresent = finalPayments.some((p) => p.method === 'fiado');
+      const primaryMethod = isSplitPayment ? 'multi' : paymentMethod;
 
       const createdSale = storage.recordFiadoSale({
-        customer_id: paymentMethod === 'fiado' ? selectedCustomerId : '',
-        customer_name: paymentMethod === 'fiado' ? customer?.name || 'Cliente Fiado' : '',
+        customer_id: isFiadoPresent ? selectedCustomerId : '',
+        customer_name: isFiadoPresent ? customer?.name || 'Cliente Fiado' : '',
         date: new Date().toISOString(),
         items: saleItems,
         subtotal_amount: cartItemsSubtotal,
@@ -418,11 +452,12 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
         interest_rate: interestRate,
         interest_amount: interestAmount,
         total_amount: cartGrandTotal,
-        payment_method: paymentMethod,
-        status: paymentMethod === 'fiado' ? 'aberto' : 'pago',
-        paid_at: paymentMethod !== 'fiado' ? new Date().toISOString() : undefined,
-        installments_count: paymentMethod === 'fiado' ? installmentsCount : 1,
-        first_due_date: paymentMethod === 'fiado' ? firstDueDate : undefined,
+        payment_method: primaryMethod as any,
+        payments: finalPayments,
+        status: isFiadoPresent ? 'aberto' : 'pago',
+        paid_at: !isFiadoPresent ? new Date().toISOString() : undefined,
+        installments_count: isFiadoPresent ? installmentsCount : 1,
+        first_due_date: isFiadoPresent ? firstDueDate : undefined,
         notes: stockOrigin === 'carga' ? `Venda realizada da Carga do Vendedor #${selectedSellerLoadId}` : undefined,
       });
 
@@ -1117,46 +1152,163 @@ export const VendaRapida: React.FC<VendaRapidaProps> = ({ products, onRefresh, o
               )}
             </div>
 
-            {/* Payment Method Selector Grid */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400">
-                Selecione a opção de Pagamento:
-              </label>
-              <div className="grid grid-cols-2 gap-2.5">
-                {[
-                  { id: 'dinheiro', label: 'Dinheiro', icon: Banknote, color: 'text-emerald-600' },
-                  { id: 'pix', label: 'PIX', icon: QrCode, color: 'text-teal-600' },
-                  { id: 'cartao', label: 'Cartão', icon: CreditCard, color: 'text-blue-600' },
-                  { id: 'fiado', label: 'Fiado', icon: BookOpenCheck, color: 'text-amber-600' },
-                ].map((pm) => {
-                  const Icon = pm.icon;
-                  const isSelected = paymentMethod === pm.id;
-                  return (
-                    <button
-                      key={pm.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(pm.id as PaymentMethod)}
-                      className={`p-3.5 rounded-xl border font-black text-xs flex items-center justify-start gap-2.5 transition ${
-                        isSelected
-                          ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Icon className={`w-5 h-5 ${pm.color}`} />
-                      <span>{pm.label}</span>
-                    </button>
-                  );
-                })}
+            {/* Payment Mode Selector (Unico vs Múltiplo) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                  Forma de Pagamento:
+                </label>
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setIsSplitPayment(false)}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                      !isSplitPayment
+                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Pagamento Único
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSplitPayment(true);
+                      if (splitPayments.length === 0 || splitPayments.reduce((s, p) => s + p.amount, 0) === 0) {
+                        setSplitPayments([
+                          { method: 'pix', amount: Math.round(cartGrandTotal * 50) / 100 },
+                          { method: 'dinheiro', amount: Math.round(cartGrandTotal * 50) / 100 },
+                        ]);
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                      isSplitPayment
+                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Dividir / Múltiplo
+                  </button>
+                </div>
               </div>
+
+              {!isSplitPayment ? (
+                /* Payment Method Selector Grid */
+                <div className="grid grid-cols-2 gap-2.5">
+                  {[
+                    { id: 'dinheiro', label: 'Dinheiro', icon: Banknote, color: 'text-emerald-600' },
+                    { id: 'pix', label: 'PIX', icon: QrCode, color: 'text-teal-600' },
+                    { id: 'cartao', label: 'Cartão', icon: CreditCard, color: 'text-blue-600' },
+                    { id: 'fiado', label: 'Fiado', icon: BookOpenCheck, color: 'text-amber-600' },
+                  ].map((pm) => {
+                    const Icon = pm.icon;
+                    const isSelected = paymentMethod === pm.id;
+                    return (
+                      <button
+                        key={pm.id}
+                        type="button"
+                        onClick={() => setPaymentMethod(pm.id as PaymentMethod)}
+                        className={`p-3.5 rounded-xl border font-black text-xs flex items-center justify-start gap-2.5 transition ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20'
+                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon className={`w-5 h-5 ${pm.color}`} />
+                        <span>{pm.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Split Payment Controls */
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="space-y-2">
+                    {splitPayments.map((p, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <select
+                          value={p.method}
+                          onChange={(e) => {
+                            const updated = [...splitPayments];
+                            updated[idx].method = e.target.value as PaymentMethod;
+                            setSplitPayments(updated);
+                          }}
+                          className="w-1/2 px-2.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-extrabold text-xs"
+                        >
+                          <option value="dinheiro">Dinheiro</option>
+                          <option value="pix">PIX</option>
+                          <option value="cartao">Cartão</option>
+                          <option value="fiado">Fiado</option>
+                        </select>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={p.amount || ''}
+                          onChange={(e) => {
+                            const updated = [...splitPayments];
+                            updated[idx].amount = parseFloat(e.target.value) || 0;
+                            setSplitPayments(updated);
+                          }}
+                          placeholder="Valor R$"
+                          className="w-1/2 px-2.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-black text-xs"
+                        />
+                        {splitPayments.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setSplitPayments(splitPayments.filter((_, i) => i !== idx))}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200 dark:border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSplitPayments([
+                          ...splitPayments,
+                          {
+                            method: 'dinheiro',
+                            amount: Math.max(0, cartGrandTotal - splitPayments.reduce((s, p) => s + p.amount, 0)),
+                          },
+                        ])
+                      }
+                      className="text-xs font-extrabold text-blue-600 hover:underline flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Adicionar Forma</span>
+                    </button>
+
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-500 block">Soma dos Pagamentos:</span>
+                      <span
+                        className={`text-xs font-black ${
+                          Math.abs(splitPayments.reduce((s, p) => s + p.amount, 0) - cartGrandTotal) < 0.01
+                            ? 'text-emerald-600'
+                            : 'text-amber-600'
+                        }`}
+                      >
+                        R$ {splitPayments.reduce((s, p) => s + p.amount, 0).toFixed(2)} / R$ {cartGrandTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* If Fiado: Customer, Interest Toggle & Installments Selector */}
-            {paymentMethod === 'fiado' && (
+            {/* If Fiado is present (single or split): Customer, Interest Toggle & Installments Selector */}
+            {((!isSplitPayment && paymentMethod === 'fiado') ||
+              (isSplitPayment && splitPayments.some((p) => p.method === 'fiado'))) && (
               <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                     <UserCheck className="w-4 h-4 text-amber-600" />
-                    <span>Selecione o Cliente (Fiado):</span>
+                    <span>Selecione o Cliente (Fiado): *</span>
                   </label>
                   <button
                     type="button"

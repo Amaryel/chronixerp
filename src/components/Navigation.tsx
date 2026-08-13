@@ -28,6 +28,7 @@ export type NavTab =
   | 'dashboard'
   | 'products'
   | 'customers'
+  | 'drivers'
   | 'entries'
   | 'exits'
   | 'venda_rapida'
@@ -55,7 +56,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   const [cadastrosOpen, setCadastrosOpen] = useState(false);
   const [movimentacoesOpen, setMovimentacoesOpen] = useState(false);
 
-  const isCadastrosActive = ['products', 'customers', 'bulk_prices'].includes(activeTab);
+  const isCadastrosActive = ['products', 'customers', 'drivers', 'bulk_prices'].includes(activeTab);
   const isMovimentacoesActive = ['entries', 'exits'].includes(activeTab);
 
   return (
@@ -127,6 +128,19 @@ export const Navigation: React.FC<NavigationProps> = ({
                   >
                     <Users className="w-4 h-4 text-emerald-400" />
                     <span>Clientes</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab('drivers');
+                      setCadastrosOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-left font-bold transition hover:bg-slate-700 ${
+                      activeTab === 'drivers' ? 'text-blue-400 font-extrabold bg-slate-750' : 'text-slate-200'
+                    }`}
+                  >
+                    <Truck className="w-4 h-4 text-blue-400" />
+                    <span>Motoristas</span>
                   </button>
 
                   <button

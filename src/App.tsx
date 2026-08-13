@@ -25,6 +25,7 @@ import { BulkPriceUpdate } from './components/BulkPriceUpdate';
 import { BulkStockAdjustment } from './components/BulkStockAdjustment';
 import { Reports } from './components/Reports';
 import { CargaVendedor } from './components/CargaVendedor';
+import { DriverManagement } from './components/DriverManagement';
 import { SupportModal } from './components/SupportModal';
 import { ContextHelpDrawer } from './components/ContextHelpDrawer';
 import { GuidedTourModal } from './components/GuidedTourModal';
@@ -309,6 +310,13 @@ export default function App() {
 
         {activeTab === 'customers' && (
           <CustomerManager onRefresh={loadState} />
+        )}
+
+        {activeTab === 'drivers' && (
+          <DriverManagement
+            onRefresh={loadState}
+            onNavigateToLoad={() => setActiveTab('carga_vendedor')}
+          />
         )}
 
         {activeTab === 'history' && (

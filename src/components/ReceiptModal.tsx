@@ -94,6 +94,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     interestAmount: sale?.interest_amount,
     totalAmount: displayTotal,
     paymentMethod: sale?.payment_method,
+    payments: sale?.payments,
     receivedAmount,
     previousBalance,
     remainingBalance,
@@ -284,15 +285,27 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           )}
 
           {type === 'venda_normal' && sale && (
-            <div className="mb-3 space-y-1 text-right text-xs">
-              <div className="flex justify-between">
-                <span>Forma Pagto:</span>
-                <span className="font-bold uppercase">{sale.payment_method}</span>
-              </div>
-              <div className="flex justify-between text-sm font-black pt-1 border-t border-slate-300">
+            <div className="mb-3 space-y-1 text-xs">
+              <div className="flex justify-between text-sm font-black pt-1 border-t border-slate-300 pb-1">
                 <span>TOTAL:</span>
                 <span>R$ {sale.total_amount.toFixed(2)}</span>
               </div>
+              {sale.payments && sale.payments.length > 0 ? (
+                <div className="space-y-0.5 pt-1 border-t border-dashed border-slate-300">
+                  <p className="font-extrabold text-[10px] text-slate-500 uppercase">Forma(s) de Pagamento:</p>
+                  {sale.payments.map((p, idx) => (
+                    <div key={idx} className="flex justify-between font-bold text-[11px]">
+                      <span className="uppercase">{p.method}:</span>
+                      <span>R$ {p.amount.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex justify-between">
+                  <span>Forma Pagto:</span>
+                  <span className="font-bold uppercase">{sale.payment_method}</span>
+                </div>
+              )}
             </div>
           )}
 

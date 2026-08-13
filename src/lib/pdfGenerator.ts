@@ -38,6 +38,7 @@ export interface ReceiptPDFData {
   interestAmount?: number;
   totalAmount?: number;
   paymentMethod?: string;
+  payments?: Array<{ method: string; amount: number }>;
   receivedAmount?: number;
   previousBalance?: number;
   remainingBalance?: number;
@@ -214,11 +215,17 @@ export function buildReceiptPDFDoc(data: ReceiptPDFData): jsPDF {
   }
 
   if (data.type === 'venda_normal') {
-    if (data.paymentMethod) {
-      printRow('Forma de Pagto:', data.paymentMethod.toUpperCase());
-    }
     if (data.totalAmount !== undefined) {
       printRow('TOTAL DA VENDA:', `R$ ${data.totalAmount.toFixed(2)}`, true);
+    }
+    if (data.payments && data.payments.length > 0) {
+      y += 1;
+      printRow('PAGAMENTOS:', '', true);
+      data.payments.forEach((p) => {
+        printRow(` ${p.method.toUpperCase()}:`, `R$ ${p.amount.toFixed(2)}`);
+      });
+    } else if (data.paymentMethod) {
+      printRow('Forma de Pagto:', data.paymentMethod.toUpperCase());
     }
   } else if (data.type === 'venda_fiado') {
     if (data.totalAmount !== undefined) {

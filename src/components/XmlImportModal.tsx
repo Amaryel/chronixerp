@@ -42,6 +42,9 @@ export const XmlImportModal: React.FC<XmlImportModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [modalTab, setModalTab] = useState<'import' | 'history'>('import');
   const [xmlImports, setXmlImports] = useState<XmlImport[]>(() => storage.getXmlImports());
+  const [xmlToDelete, setXmlToDelete] = useState<XmlImport | null>(null);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
+  const [deleteErrorMsg, setDeleteErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -49,20 +52,22 @@ export const XmlImportModal: React.FC<XmlImportModalProps> = ({
     }
   }, [isOpen, modalTab]);
 
-  const handleDeleteXmlImport = (importId: string, nfeNum: string) => {
-    if (
-      window.confirm(
-        `Tem certeza que deseja excluir a entrada da NF-e #${nfeNum}? Isso irá reverter o estoque adicionado por esta nota.`
-      )
-    ) {
-      try {
-        const res = storage.deleteXmlImportWithStockRollback(importId);
-        setXmlImports(storage.getXmlImports());
-        alert(`Entrada XML excluída com sucesso! ${res.rolledBackItems} item(ns) tiveram seu estoque revertido.`);
-        onSuccess();
-      } catch (err: any) {
-        alert(err.message || 'Erro ao excluir entrada XML.');
-      }
+  const handlePromptDeleteXmlImport = (imp: XmlImport) => {
+    setXmlToDelete(imp);
+    setDeleteErrorMsg(null);
+  };
+
+  const confirmExecuteDeleteXmlImport = () => {
+    if (!xmlToDelete) return;
+    try {
+      const res = storage.deleteXmlImportWithStockRollback(xmlToDelete.id);
+      setXmlImports(storage.getXmlImports());
+      setDeleteSuccessMsg(`✓ Entrada de NF-e #${xmlToDelete.nfe_number || 'S/N'} (${xmlToDelete.supplier_name}) excluída com sucesso! ${res.rolledBackItems} item(ns) tiveram seu estoque revertido.`);
+      setXmlToDelete(null);
+      setTimeout(() => setDeleteSuccessMsg(null), 6000);
+      onSuccess();
+    } catch (err: any) {
+      setDeleteErrorMsg(err.message || 'Erro ao excluir entrada XML.');
     }
   };
 
@@ -354,6 +359,15 @@ export const XmlImportModal: React.FC<XmlImportModalProps> = ({
         {modalTab === 'history' ? (
           /* XML History & Rollback Deletion View */
           <div className="space-y-4 my-2">
+            {deleteSuccessMsg && (
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-300 text-xs font-bold shadow-sm flex items-center justify-between">
+                <span>{deleteSuccessMsg}</span>
+                <button onClick={() => setDeleteSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             <div className="p-3 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200">
               <strong>Atenção:</strong> Ao excluir uma entrada de NF-e via XML, as movimentações de estoque registradas por ela serão removidas e a quantidade de estoque adicionada será automaticamente subtraída dos produtos.
             </div>
@@ -392,8 +406,8 @@ export const XmlImportModal: React.FC<XmlImportModalProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => handleDeleteXmlImport(imp.id, imp.nfe_number)}
-                      className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs shrink-0 transition"
+                      onClick={() => handlePromptDeleteXmlImport(imp)}
+                      className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs shrink-0 transition cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Excluir Entrada & Reverter Estoque</span>
@@ -691,6 +705,71 @@ export const XmlImportModal: React.FC<XmlImportModalProps> = ({
           </div>
         )}
       </div>
+
+      {/* CONFIRMATION MODAL FOR XML IMPORT DELETION */}
+      {xmlToDelete && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-rose-100 text-rose-600 dark:bg-rose-950/80 dark:text-rose-400">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-white text-base">
+                  Excluir Entrada XML e Reverter Estoque
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Confirmação irreversível de estorno de nota fiscal
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-xs text-slate-700 dark:text-slate-300 space-y-2">
+              <p className="font-medium">
+                Você está prestes a excluir a entrada da NF-e:
+              </p>
+              <p className="font-extrabold text-sm text-slate-900 dark:text-white">
+                NF-e #{xmlToDelete.nfe_number || 'S/N'}
+              </p>
+              <p className="text-[11px] text-slate-500 font-semibold">
+                Fornecedor: {xmlToDelete.supplier_name || 'N/A'}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {xmlToDelete.items_count} item(ns) importado(s) | Total: R$ {(xmlToDelete.total_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-xl text-amber-800 dark:text-amber-300 text-[11px] font-semibold mt-2">
+                ⚠️ O estoque adicionado por todos os {xmlToDelete.items_count} itens desta nota fiscal será automaticamente subtraído/revertido do saldo atual dos produtos.
+              </div>
+            </div>
+
+            {deleteErrorMsg && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">
+                {deleteErrorMsg}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setXmlToDelete(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmExecuteDeleteXmlImport}
+                className="px-5 py-2.5 rounded-xl text-white font-black text-xs shadow-lg shadow-rose-600/20 bg-rose-600 hover:bg-rose-700 transition flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sim, Excluir e Reverter Estoque</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

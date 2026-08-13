@@ -44,6 +44,7 @@ import {
   SellerLoadStatus,
   PaymentMethod,
   Customer,
+  Driver,
 } from '../types';
 import { storage } from '../services/storage';
 import { formatStockDisplay } from '../lib/unitConverter';
@@ -164,11 +165,58 @@ export const CargaVendedor: React.FC<CargaVendedorProps> = ({
 
   const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
 
+  // Drivers Management State
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('');
+  const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+  const [driverNameInput, setDriverNameInput] = useState('');
+  const [driverPhoneInput, setDriverPhoneInput] = useState('');
+  const [driverLicenseInput, setDriverLicenseInput] = useState('');
+  const [driverVehicleInput, setDriverVehicleInput] = useState('');
+  const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
+
   // Load seller loads from storage
   const reloadData = () => {
     const list = storage.getSellerLoads();
     setSellerLoads(list);
+    setDrivers(storage.getDrivers());
     onRefresh();
+  };
+
+  const handleSaveDriver = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!driverNameInput.trim()) return;
+    storage.saveDriver({
+      id: editingDriverId || undefined,
+      name: driverNameInput.trim(),
+      phone: driverPhoneInput.trim(),
+      license_number: driverLicenseInput.trim(),
+      vehicle: driverVehicleInput.trim(),
+    });
+    setDriverNameInput('');
+    setDriverPhoneInput('');
+    setDriverLicenseInput('');
+    setDriverVehicleInput('');
+    setEditingDriverId(null);
+    reloadData();
+  };
+
+  const handleDeleteDriver = (id: string) => {
+    storage.deleteDriver(id);
+    if (selectedDriverId === id) setSelectedDriverId('');
+    reloadData();
+  };
+
+  const handleSelectDriverForLoad = (driverId: string) => {
+    setSelectedDriverId(driverId);
+    if (driverId) {
+      const drv = drivers.find((d) => d.id === driverId);
+      if (drv) {
+        if (drv.vehicle && (!newVehicle || newVehicle.trim() === '')) {
+          setNewVehicle(drv.vehicle);
+        }
+      }
+    }
   };
 
   useEffect(() => {
@@ -259,8 +307,13 @@ export const CargaVendedor: React.FC<CargaVendedorProps> = ({
     }
 
     try {
+      const vendorClean = newVendorName.trim();
+      const matchedDriver = drivers.find((d) => d.name.toLowerCase() === vendorClean.toLowerCase());
+
       const newLoad = storage.createSellerLoad({
-        vendor_name: newVendorName.trim(),
+        vendor_name: vendorClean,
+        driver_id: matchedDriver ? matchedDriver.id : undefined,
+        driver_name: vendorClean, // Motorista = Vendedor da rota
         vehicle: newVehicle.trim(),
         departure_date: newDepartureDate,
         notes: newNotes.trim(),
@@ -279,6 +332,7 @@ export const CargaVendedor: React.FC<CargaVendedorProps> = ({
 
       // Reset form
       setNewVendorName('');
+      setSelectedDriverId('');
       setNewVehicle('');
       setNewNotes('');
       setDraftItems([]);
@@ -809,6 +863,11 @@ export const CargaVendedor: React.FC<CargaVendedorProps> = ({
                     <span className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                       <UserIcon className="w-4 h-4 text-slate-500" />
                       {currentLoad.vendor_name}
+                      {currentLoad.driver_name && (
+                        <span className="text-xs text-blue-600 dark:text-blue-400 font-bold ml-1">
+                          (Mot: {currentLoad.driver_name})
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div>
@@ -1323,16 +1382,22 @@ export const CargaVendedor: React.FC<CargaVendedorProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Vendedor *
+                  Vendedor (Responsável pela Rota) *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: João da Silva"
+                  list="vendors-list"
+                  placeholder="Ex: João Silva"
                   value={newVendorName}
                   onChange={(e) => setNewVendorName(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-xs text-slate-900 dark:text-white"
                 />
+                <datalist id="vendors-list">
+                  {drivers.map((drv) => (
+                    <option key={drv.id} value={drv.name} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
@@ -1354,7 +1419,7 @@ export const CargaVendedor: React.FC<CargaVendedorProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Fiorino Placa ABC-1234"
+                  placeholder="Ex: Fiorino ABC-1234"
                   value={newVehicle}
                   onChange={(e) => setNewVehicle(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-xs text-slate-900 dark:text-white"
@@ -2175,6 +2240,211 @@ export const CargaVendedor: React.FC<CargaVendedorProps> = ({
                 }`}
               >
                 {isProcessing ? 'Processando...' : 'Sim, Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* DRIVER MANAGEMENT MODAL */}
+      {isDriverModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-950/80 dark:text-blue-400">
+                  <Truck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 dark:text-white text-base">
+                    Cadastro de Motoristas da Rota
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Gerencie a lista de motoristas salvos para seleção rápida
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDriverModalOpen(false);
+                  setEditingDriverId(null);
+                  setDriverNameInput('');
+                  setDriverPhoneInput('');
+                  setDriverLicenseInput('');
+                  setDriverVehicleInput('');
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* FORM TO ADD/EDIT DRIVER */}
+            <form onSubmit={handleSaveDriver} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+              <span className="text-xs font-black text-slate-800 dark:text-slate-200 block uppercase">
+                {editingDriverId ? 'Editar Motorista' : 'Novo Motorista'}
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Nome Completo *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Carlos Eduardo"
+                    value={driverNameInput}
+                    onChange={(e) => setDriverNameInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Telefone / WhatsApp
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: (11) 98888-7777"
+                    value={driverPhoneInput}
+                    onChange={(e) => setDriverPhoneInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    CNH / Documento
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 12345678900"
+                    value={driverLicenseInput}
+                    onChange={(e) => setDriverLicenseInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Placa / Veículo Habitual
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Fiorino Placa ABC-1234"
+                    value={driverVehicleInput}
+                    onChange={(e) => setDriverVehicleInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                {editingDriverId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingDriverId(null);
+                      setDriverNameInput('');
+                      setDriverPhoneInput('');
+                      setDriverLicenseInput('');
+                      setDriverVehicleInput('');
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  >
+                    Cancelar Edição
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{editingDriverId ? 'Salvar Alterações' : 'Cadastrar Motorista'}</span>
+                </button>
+              </div>
+            </form>
+
+            {/* LIST OF SAVED DRIVERS */}
+            <div className="space-y-2">
+              <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300 block uppercase">
+                Motoristas Cadastrados ({drivers.length})
+              </span>
+
+              {drivers.length === 0 ? (
+                <div className="text-center py-6 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 text-xs">
+                  Nenhum motorista cadastrado ainda.
+                </div>
+              ) : (
+                <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                  {drivers.map((drv) => (
+                    <div
+                      key={drv.id}
+                      className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span>{drv.name}</span>
+                          {drv.phone && (
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              📞 {drv.phone}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium">
+                          {drv.vehicle ? `🚚 ${drv.vehicle}` : 'Sem veículo fixo'}
+                          {drv.license_number ? ` • CNH: ${drv.license_number}` : ''}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDriverId(drv.id);
+                            if (drv.vehicle) setNewVehicle(drv.vehicle);
+                            setIsDriverModalOpen(false);
+                          }}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] rounded-lg shadow"
+                        >
+                          Selecionar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingDriverId(drv.id);
+                            setDriverNameInput(drv.name || '');
+                            setDriverPhoneInput(drv.phone || '');
+                            setDriverLicenseInput(drv.license_number || '');
+                            setDriverVehicleInput(drv.vehicle || '');
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-[11px] rounded-lg hover:bg-slate-300"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDriver(drv.id)}
+                          className="p-1.5 text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/50 rounded-lg transition"
+                          title="Excluir Motorista"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsDriverModalOpen(false)}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs hover:bg-slate-300 dark:hover:bg-slate-600"
+              >
+                Concluído
               </button>
             </div>
           </div>

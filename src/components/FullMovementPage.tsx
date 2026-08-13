@@ -117,6 +117,7 @@ export const FullMovementPage: React.FC<FullMovementPageProps> = ({
 
   // Search/Filter for history table at bottom
   const [historySearch, setHistorySearch] = useState('');
+  const [movementToDelete, setMovementToDelete] = useState<Movement | null>(null);
 
   // Ref for auto-focusing first field
   const productSelectRef = React.useRef<HTMLSelectElement>(null);
@@ -325,19 +326,19 @@ export const FullMovementPage: React.FC<FullMovementPageProps> = ({
   };
 
   const handleDeleteMovement = (mov: Movement) => {
-    if (
-      window.confirm(
-        `Tem certeza que deseja excluir este lançamento de ${mov.product_name} (${mov.used_qty} ${mov.used_unit})? O estoque será revertido automaticamente.`
-      )
-    ) {
-      try {
-        storage.deleteMovement(mov.id);
-        setSuccessMessage('Lançamento excluído e estoque revertido com sucesso.');
-        setTimeout(() => setSuccessMessage(null), 3000);
-        onRefresh();
-      } catch (err: any) {
-        setErrorMessage(err.message || 'Erro ao excluir lançamento.');
-      }
+    setMovementToDelete(mov);
+  };
+
+  const confirmExecuteDeleteMovement = () => {
+    if (!movementToDelete) return;
+    try {
+      storage.deleteMovement(movementToDelete.id);
+      setSuccessMessage(`✓ Lançamento de "${movementToDelete.product_name}" excluído e estoque revertido com sucesso!`);
+      setTimeout(() => setSuccessMessage(null), 4000);
+      setMovementToDelete(null);
+      onRefresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Erro ao excluir lançamento.');
     }
   };
 
@@ -1202,6 +1203,61 @@ export const FullMovementPage: React.FC<FullMovementPageProps> = ({
           preSale={createdPreSaleReceipt}
           onClose={() => setCreatedPreSaleReceipt(null)}
         />
+      )}
+
+      {/* CONFIRMATION MODAL FOR MOVEMENT DELETION & STOCK REVERSAL */}
+      {movementToDelete && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-rose-100 text-rose-600 dark:bg-rose-950/80 dark:text-rose-400">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-white text-base">
+                  Excluir Lançamento e Reverter Estoque
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Confirmação de estorno de lançamento
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-xs text-slate-700 dark:text-slate-300 space-y-2">
+              <p className="font-medium">
+                Confirma a exclusão deste lançamento?
+              </p>
+              <p className="font-extrabold text-sm text-slate-900 dark:text-white">
+                {movementToDelete.product_name}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Quantidade: <strong className="text-slate-800 dark:text-slate-200">{movementToDelete.used_qty} {movementToDelete.used_unit}</strong> ({movementToDelete.converted_qty} {movementToDelete.main_unit})
+              </p>
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-xl text-amber-800 dark:text-amber-300 text-[11px] font-semibold">
+                ⚠️ O estoque principal do produto será automaticamente recomposto ou estornado de acordo com o tipo deste lançamento.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setMovementToDelete(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmExecuteDeleteMovement}
+                className="px-5 py-2.5 rounded-xl text-white font-black text-xs shadow-lg shadow-rose-600/20 bg-rose-600 hover:bg-rose-700 transition flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sim, Excluir e Reverter</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

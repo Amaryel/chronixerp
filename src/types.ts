@@ -83,6 +83,9 @@ export interface Product {
   markup?: number; // Markup em %
   box_conversion_unit?: 'KG' | 'UN' | string; // 1 Caixa equivale a X KG ou UN
   box_conversion_value?: number; // Valor do fator (ex: 20 ou 24)
+  allow_fractional?: boolean; // Permitir venda fracionada (0,5 CX / 10 KG)
+  price_per_kg?: number;
+  price_per_box?: number;
   barcode?: string;
   category_id?: string;
   brand?: string;
@@ -144,6 +147,7 @@ export interface FiadoSale {
   interest_amount?: number;
   total_amount: number;
   payment_method: PaymentMethod;
+  payments?: PaymentDetail[];
   status: 'aberto' | 'pago' | 'cancelado';
   paid_at?: string;
   notes?: string;
@@ -181,6 +185,11 @@ export interface Batch {
 export type MovementType = 'entrada' | 'saida' | 'ajuste';
 export type MovementOrigin = 'manual' | 'xml' | 'inventario' | 'venda_rapida' | 'pre_venda' | 'fiado' | 'pdv' | 'carga_vendedor';
 
+export interface PaymentDetail {
+  method: 'dinheiro' | 'pix' | 'cartao' | 'fiado' | string;
+  amount: number;
+}
+
 export interface Movement {
   id: string;
   date: string; // ISO string
@@ -204,6 +213,7 @@ export interface Movement {
   expiration_date?: string;
   origin: MovementOrigin;
   payment_method?: string;
+  payments?: PaymentDetail[];
   notes?: string;
   xml_import_id?: string;
   nfe_number?: string;
@@ -331,9 +341,10 @@ export interface AuditLog {
 }
 
 export interface SystemSettings {
-  allow_negative_stock: boolean; // default: false ("Não permitir")
-  auto_clear_form: boolean;      // default: true ("Limpar tela automaticamente")
-  fiado_interest_rate: number;   // default: 5 (5%)
+  allow_negative_stock: boolean;  // default: false ("Não permitir")
+  auto_clear_form: boolean;       // default: true ("Limpar tela automaticamente")
+  fiado_interest_rate: number;    // default: 5 (5%)
+  default_allow_fractional?: boolean; // default: false ("Não permitir venda fracionada como regra global")
 }
 
 export interface DailyConferenceStockItem {
@@ -471,9 +482,11 @@ export interface SellerLoadSale {
   sale_id: string;
   type: 'pdv' | 'fiado' | 'venda_rapida';
   date: string;
+  customer_id?: string;
   customer_name?: string;
   total_amount: number;
   payment_method: PaymentMethod | string;
+  payments?: PaymentDetail[];
   items: {
     product_id: string;
     product_name: string;
@@ -488,8 +501,11 @@ export interface Driver {
   id: string;
   name: string;
   phone?: string;
-  license_number?: string; // CNH / Documento
-  vehicle?: string;        // Placa ou veículo principal
+  cpf?: string;
+  license_number?: string; // CNH
+  vehicle?: string;        // Veículo principal
+  license_plate?: string;  // Placa do veículo
+  notes?: string;          // Observações
   status?: 'active' | 'inactive';
   created_at?: string;
 }
