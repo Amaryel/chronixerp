@@ -147,9 +147,21 @@ CREATE TABLE IF NOT EXISTS usuarios (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
+  username TEXT,
+  password TEXT,
   role TEXT NOT NULL DEFAULT 'funcionario', -- 'superadmin' | 'admin' | 'funcionario'
+  company_id TEXT,
+  is_approved BOOLEAN DEFAULT TRUE,
+  is_blocked BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Garantir que colunas existam se a tabela tiver sido criada previamente
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS username TEXT;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS password TEXT;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS company_id TEXT;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT TRUE;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE;
 
 -- 2. Categorias
 CREATE TABLE IF NOT EXISTS categorias (

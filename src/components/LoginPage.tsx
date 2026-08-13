@@ -43,10 +43,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [pendingNotice, setPendingNotice] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  React.useEffect(() => {
+    storage.syncUsersFromSupabase();
+  }, []);
 
   const isSuperadminAttempt = email.trim().toLowerCase() === SUPERADMIN_EMAIL;
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
@@ -57,26 +62,39 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    const result = storage.login(email, password);
-    if (!result.success || !result.user) {
-      setErrorMessage(result.error || 'Erro ao realizar login.');
-      return;
-    }
+    setIsLoggingIn(true);
 
-    // Handle Remember Me / Session persistence
-    if (rememberMe) {
-      localStorage.setItem('aquinos_remember_me', 'true');
-      localStorage.setItem('aquinos_saved_email', email.trim());
-      localStorage.setItem('aquinos_saved_password', password);
-    } else {
-      localStorage.removeItem('aquinos_remember_me');
-      localStorage.removeItem('aquinos_saved_email');
-      localStorage.removeItem('aquinos_saved_password');
-    }
-    sessionStorage.setItem('aquinos_session_active', 'true');
+    try {
+      let result = storage.login(email, password);
+      
+      // If user not found locally or login failed, attempt to sync from Supabase and retry
+      if (!result.success) {
+        await storage.syncUsersFromSupabase();
+        result = storage.login(email, password);
+      }
 
-    // Immediate callback on login success so hitting Enter logs in right away
-    onLoginSuccess(result.user);
+      if (!result.success || !result.user) {
+        setErrorMessage(result.error || 'Erro ao realizar login.');
+        return;
+      }
+
+      // Handle Remember Me / Session persistence
+      if (rememberMe) {
+        localStorage.setItem('aquinos_remember_me', 'true');
+        localStorage.setItem('aquinos_saved_email', email.trim());
+        localStorage.setItem('aquinos_saved_password', password);
+      } else {
+        localStorage.removeItem('aquinos_remember_me');
+        localStorage.removeItem('aquinos_saved_email');
+        localStorage.removeItem('aquinos_saved_password');
+      }
+      sessionStorage.setItem('aquinos_session_active', 'true');
+
+      // Immediate callback on login success so hitting Enter logs in right away
+      onLoginSuccess(result.user);
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const handleResetPassword = (e: React.FormEvent) => {
@@ -342,10 +360,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 mt-2"
+                disabled={isLoggingIn}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 mt-2 disabled:opacity-60"
               >
-                <LogIn className="w-4 h-4" />
-                <span>Entrar no Sistema</span>
+                <LogIn className={`w-4 h-4 ${isLoggingIn ? 'animate-spin' : ''}`} />
+                <span>{isLoggingIn ? 'Verificando e Entrando...' : 'Entrar no Sistema'}</span>
               </button>
             </form>
           ) : mode === 'forgot' ? (

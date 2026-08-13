@@ -383,6 +383,7 @@ class StorageService {
 
   constructor() {
     this.initDefaultData();
+    this.syncUsersFromSupabase();
   }
 
   private initDefaultData() {
@@ -602,6 +603,119 @@ class StorageService {
     return { success: true };
   }
 
+  // --- SUPABASE USER SYNC HELPERS ---
+  public async saveUserToSupabase(user: User): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('usuarios').upsert({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        username: user.username || null,
+        password: user.password || '123',
+        role: user.role,
+        company_id: user.company_id || 'comp-aquino',
+        is_approved: user.is_approved !== false,
+        is_blocked: user.is_blocked === true,
+        created_at: user.created_at || new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Failed to save user to Supabase:', err);
+    }
+  }
+
+  public async deleteUserFromSupabase(userId: string): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('usuarios').delete().eq('id', userId);
+    } catch (err) {
+      console.warn('Failed to delete user from Supabase:', err);
+    }
+  }
+
+  public async syncUsersFromSupabase(): Promise<User[]> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return this.getUsers();
+
+      const { data, error } = await client.from('usuarios').select('*');
+      if (error || !data) {
+        return this.getUsers();
+      }
+
+      if (data.length === 0) {
+        const local = this.getUsers();
+        for (const u of local) {
+          await this.saveUserToSupabase(u);
+        }
+        return local;
+      }
+
+      const localUsers = this.getUsers();
+      const userMap = new Map<string, User>();
+
+      for (const u of localUsers) {
+        userMap.set(u.id, u);
+      }
+
+      for (const row of data) {
+        const remoteUser: User = {
+          id: row.id || 'usr-' + Date.now(),
+          name: row.name || 'Usuário',
+          email: row.email,
+          username: row.username || undefined,
+          password: row.password || '123',
+          role: row.role || 'funcionario',
+          company_id: row.company_id || 'comp-aquino',
+          is_approved: row.is_approved !== false,
+          is_blocked: row.is_blocked === true,
+          created_at: row.created_at || new Date().toISOString(),
+        };
+
+        const existingById = userMap.get(remoteUser.id);
+        const existingByEmail = Array.from(userMap.values()).find(
+          (u) => u.email.toLowerCase() === remoteUser.email.toLowerCase()
+        );
+
+        const target = existingById || existingByEmail;
+        if (target) {
+          const merged: User = {
+            ...target,
+            ...remoteUser,
+            role: remoteUser.email.toLowerCase() === SUPERADMIN_EMAIL ? 'superadmin' : remoteUser.role,
+            is_approved: remoteUser.email.toLowerCase() === SUPERADMIN_EMAIL ? true : remoteUser.is_approved,
+            is_blocked: remoteUser.email.toLowerCase() === SUPERADMIN_EMAIL ? false : remoteUser.is_blocked,
+          };
+          userMap.set(merged.id, merged);
+        } else {
+          userMap.set(remoteUser.id, remoteUser);
+        }
+      }
+
+      const mergedUsers = Array.from(userMap.values());
+      let hasSuper = false;
+      for (const u of mergedUsers) {
+        if (u.email.toLowerCase() === SUPERADMIN_EMAIL) {
+          hasSuper = true;
+          u.role = 'superadmin';
+          u.is_approved = true;
+          u.is_blocked = false;
+        }
+      }
+      if (!hasSuper) {
+        mergedUsers.unshift(DEFAULT_USERS[0]);
+      }
+
+      this.setItem(STORAGE_KEYS.USERS, mergedUsers);
+      return mergedUsers;
+    } catch (err) {
+      console.warn('Error in syncUsersFromSupabase:', err);
+      return this.getUsers();
+    }
+  }
+
   // --- AUTHENTICATION & USER MANAGEMENT ---
   public getUsers(): User[] {
     return this.getItem<User[]>(STORAGE_KEYS.USERS, DEFAULT_USERS);
@@ -745,6 +859,7 @@ class StorageService {
 
     users[idx].password = newPassword;
     this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(users[idx]);
     this.addAuditLog('alteracao_lote', `Senha redefinida com sucesso para ${users[idx].name}`);
 
     return { success: true };
@@ -784,6 +899,7 @@ class StorageService {
         };
         users[existingIndex] = superUser;
         this.setItem(STORAGE_KEYS.USERS, users);
+        this.saveUserToSupabase(superUser);
         this.setCurrentUser(superUser);
         return { success: true, user: superUser };
       }
@@ -808,6 +924,7 @@ class StorageService {
 
     users.push(newUser);
     this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(newUser);
 
     this.addAuditLog('cadastro_produto', `Novo usuário cadastrado: ${newUser.name} (${newUser.email} / @${newUser.username})`);
 
@@ -844,6 +961,7 @@ class StorageService {
 
     users[idx] = updated;
     this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(updated);
 
     const curr = this.getCurrentUser();
     if (curr && curr.id === userId) {
@@ -868,6 +986,7 @@ class StorageService {
     const newApprovalState = user.is_approved === false ? true : false;
     users[userIndex] = { ...user, is_approved: newApprovalState };
     this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(users[userIndex]);
 
     this.addAuditLog(
       'alteracao_lote',
@@ -885,6 +1004,7 @@ class StorageService {
 
     users[userIndex] = { ...users[userIndex], company_id: companyId };
     this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(users[userIndex]);
 
     const comp = this.getCompanyById(companyId);
     this.addAuditLog('alteracao_lote', `Usuário ${users[userIndex].name} vinculado à empresa ${comp?.name || companyId}`);
@@ -925,6 +1045,7 @@ class StorageService {
     const newBlockedState = !user.is_blocked;
     users[userIndex] = { ...user, is_blocked: newBlockedState };
     this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(users[userIndex]);
 
     this.addAuditLog(
       'alteracao_lote',
@@ -947,6 +1068,7 @@ class StorageService {
 
     users[userIndex] = { ...user, role: newRole };
     this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(users[userIndex]);
     this.addAuditLog('alteracao_lote', `Função do usuário ${user.name} alterada para ${newRole.toUpperCase()}`);
 
     return { success: true };
@@ -960,6 +1082,7 @@ class StorageService {
 
     users[userIndex] = { ...users[userIndex], password: newPassword };
     this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(users[userIndex]);
     return { success: true };
   }
 
@@ -974,6 +1097,7 @@ class StorageService {
 
     const filtered = users.filter((u) => u.id !== userId);
     this.setItem(STORAGE_KEYS.USERS, filtered);
+    this.deleteUserFromSupabase(userId);
     this.addAuditLog('exclusao_produto', `Usuário removido: ${target.name} (${target.email})`);
 
     return { success: true };

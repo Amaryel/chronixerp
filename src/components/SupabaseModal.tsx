@@ -114,15 +114,22 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, c
           id: u.id,
           name: u.name,
           email: u.email,
+          username: u.username || null,
+          password: u.password || '123',
           role: u.role,
-          created_at: u.created_at,
+          company_id: u.company_id || 'comp-aquino',
+          is_approved: u.is_approved !== false,
+          is_blocked: u.is_blocked === true,
+          created_at: u.created_at || new Date().toISOString(),
         });
         if (!error) syncedCount++;
       }
 
+      await storage.syncUsersFromSupabase();
+
       setStatusMsg({
         type: 'success',
-        text: `Sincronização concluída! ${syncedCount} usuário(s) sincronizados com a tabela 'usuarios' do Supabase.`,
+        text: `Sincronização de usuários concluída com sucesso! ${syncedCount} usuário(s) ativos e integrados com o banco online.`,
       });
     } catch (err: any) {
       setStatusMsg({
