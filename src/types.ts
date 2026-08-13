@@ -27,6 +27,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  username?: string;
   role: UserRole;
   company_id?: string;
   is_approved?: boolean;

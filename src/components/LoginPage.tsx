@@ -75,10 +75,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }
     sessionStorage.setItem('aquinos_session_active', 'true');
 
-    setSuccessMessage(`Bem-vindo ao Chronix ERP, ${result.user.name}!`);
-    setTimeout(() => {
-      onLoginSuccess(result.user!);
-    }, 300);
+    // Immediate callback on login success so hitting Enter logs in right away
+    onLoginSuccess(result.user);
   };
 
   const handleResetPassword = (e: React.FormEvent) => {
@@ -276,13 +274,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   E-mail ou Usuário
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+                  <UserIcon className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                   <input
-                    type="email"
+                    type="text"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="seu.email@empresa.com.br"
+                    placeholder="Seu e-mail ou nome de usuário (ex: joao, admin)"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-blue-500 font-medium transition"
                   />
                 </div>

@@ -137,6 +137,7 @@ const DEFAULT_USERS: User[] = [
     id: 'usr-superadmin',
     name: 'Amaryel (Superadmin)',
     email: 'amaryelcc@gmail.com',
+    username: 'amaryel',
     role: 'superadmin',
     company_id: 'comp-aquino',
     is_approved: true,
@@ -148,6 +149,7 @@ const DEFAULT_USERS: User[] = [
     id: 'usr-admin-1',
     name: 'Francisco Aquino',
     email: 'francisco@aquinosfrios.com.br',
+    username: 'francisco',
     role: 'admin',
     company_id: 'comp-aquino',
     is_approved: true,
@@ -159,6 +161,7 @@ const DEFAULT_USERS: User[] = [
     id: 'usr-func-1',
     name: 'João Pedro (Estoquista)',
     email: 'joao@aquinosfrios.com.br',
+    username: 'joao',
     role: 'funcionario',
     company_id: 'comp-aquino',
     is_approved: true,
@@ -643,17 +646,25 @@ class StorageService {
     this.addAuditLog('troca_perfil', `Sessão ativa para ${user.name} (${user.role.toUpperCase()})`);
   }
 
-  public login(email: string, password?: string): { success: boolean; user?: User; error?: string } {
-    const cleanEmail = email.trim().toLowerCase();
+  public login(identifier: string, password?: string): { success: boolean; user?: User; error?: string } {
+    const cleanId = identifier.trim().toLowerCase();
     const users = this.getUsers();
-    let found = users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    // Match by email, username or name
+    let found = users.find(
+      (u) =>
+        u.email.toLowerCase() === cleanId ||
+        (u.username && u.username.toLowerCase() === cleanId) ||
+        (u.name && u.name.toLowerCase() === cleanId)
+    );
 
     // If superadmin email and not found yet, create automatically
-    if (!found && cleanEmail === SUPERADMIN_EMAIL) {
+    if (!found && cleanId === SUPERADMIN_EMAIL) {
       found = {
         id: 'usr-superadmin',
         name: 'Amaryel (Superadmin)',
         email: SUPERADMIN_EMAIL,
+        username: 'amaryel',
         role: 'superadmin',
         company_id: 'comp-aquino',
         is_approved: true,
@@ -666,11 +677,11 @@ class StorageService {
     }
 
     if (!found) {
-      return { success: false, error: 'Usuário não encontrado com este e-mail. Solicite o cadastro ao Administrador ou crie uma conta.' };
+      return { success: false, error: 'Usuário não encontrado com este e-mail ou nome de usuário. Solicite o cadastro ou verifique seus dados.' };
     }
 
     // Special logic for Superadmin (amaryelcc@gmail.com): always approve and auto-update password if entered
-    if (cleanEmail === SUPERADMIN_EMAIL) {
+    if (cleanId === SUPERADMIN_EMAIL || found.email.toLowerCase() === SUPERADMIN_EMAIL) {
       found.role = 'superadmin';
       found.is_approved = true;
       found.is_blocked = false;
@@ -687,7 +698,7 @@ class StorageService {
       if (found.is_blocked) {
         return {
           success: false,
-          error: 'Sua conta foi bloqueada. Entre em contato com o suporte ou Superadmin.',
+          error: 'Sua conta foi bloqueada. Entre em contato com o suporte ou Administrador.',
         };
       }
 
@@ -695,7 +706,7 @@ class StorageService {
       if (found.is_approved === false) {
         return {
           success: false,
-          error: 'Sua conta está pendente de liberação pelo Superadmin.',
+          error: 'Sua conta está pendente de liberação pelo Administrador.',
         };
       }
 
@@ -707,7 +718,7 @@ class StorageService {
     }
 
     // Check company status if user belongs to a company
-    if (found.company_id && cleanEmail !== SUPERADMIN_EMAIL) {
+    if (found.company_id && found.email.toLowerCase() !== SUPERADMIN_EMAIL) {
       const company = this.getCompanyById(found.company_id);
       if (company && company.status === 'blocked') {
         return {
@@ -724,15 +735,17 @@ class StorageService {
   public resetUserPasswordByEmail(email: string, newPassword: string): { success: boolean; error?: string } {
     const cleanEmail = email.trim().toLowerCase();
     const users = this.getUsers();
-    const idx = users.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+    const idx = users.findIndex(
+      (u) => u.email.toLowerCase() === cleanEmail || (u.username && u.username.toLowerCase() === cleanEmail)
+    );
 
     if (idx === -1) {
-      return { success: false, error: 'E-mail não encontrado no sistema.' };
+      return { success: false, error: 'Usuário ou e-mail não encontrado no sistema.' };
     }
 
     users[idx].password = newPassword;
     this.setItem(STORAGE_KEYS.USERS, users);
-    this.addAuditLog('alteracao_lote', `Senha redefinida com sucesso para ${users[idx].name} (${cleanEmail})`);
+    this.addAuditLog('alteracao_lote', `Senha redefinida com sucesso para ${users[idx].name}`);
 
     return { success: true };
   }
@@ -740,20 +753,30 @@ class StorageService {
   public registerUser(data: {
     name: string;
     email: string;
+    username?: string;
     password?: string;
     role?: UserRole;
     company_id?: string;
+    is_approved?: boolean;
   }): { success: boolean; user?: User; error?: string } {
     const cleanEmail = data.email.trim().toLowerCase();
+    const cleanUsername = (data.username || '').trim().toLowerCase();
     const users = this.getUsers();
 
-    const existingIndex = users.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+    // Check existing by email or username
+    const existingIndex = users.findIndex(
+      (u) =>
+        u.email.toLowerCase() === cleanEmail ||
+        (cleanUsername && u.username && u.username.toLowerCase() === cleanUsername)
+    );
+
     if (existingIndex !== -1) {
       if (cleanEmail === SUPERADMIN_EMAIL) {
         // Update superadmin credentials directly
         const superUser: User = {
           ...users[existingIndex],
           name: data.name.trim() || 'Amaryel (Superadmin)',
+          username: cleanUsername || users[existingIndex].username || 'amaryel',
           password: data.password || users[existingIndex].password || '123',
           role: 'superadmin',
           is_approved: true,
@@ -764,7 +787,7 @@ class StorageService {
         this.setCurrentUser(superUser);
         return { success: true, user: superUser };
       }
-      return { success: false, error: 'Este e-mail já está cadastrado no sistema.' };
+      return { success: false, error: 'Este e-mail ou nome de usuário já está cadastrado no sistema.' };
     }
 
     const isSuper = cleanEmail === SUPERADMIN_EMAIL;
@@ -774,9 +797,10 @@ class StorageService {
       id: 'usr-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
       name: data.name.trim(),
       email: cleanEmail,
+      username: cleanUsername || cleanEmail.split('@')[0],
       role: assignedRole,
       company_id: data.company_id || 'comp-aquino',
-      is_approved: isSuper ? true : false, // Pending approval for new users
+      is_approved: data.is_approved !== undefined ? data.is_approved : isSuper ? true : true, // Auto-approve created users
       password: data.password || '123',
       is_blocked: false,
       created_at: new Date().toISOString(),
@@ -785,9 +809,49 @@ class StorageService {
     users.push(newUser);
     this.setItem(STORAGE_KEYS.USERS, users);
 
-    this.addAuditLog('cadastro_produto', `Novo usuário cadastrado: ${newUser.name} (${newUser.email} - ${newUser.role})`);
+    this.addAuditLog('cadastro_produto', `Novo usuário cadastrado: ${newUser.name} (${newUser.email} / @${newUser.username})`);
 
     return { success: true, user: newUser };
+  }
+
+  public updateUserFull(userId: string, data: Partial<User>): { success: boolean; user?: User; error?: string } {
+    const users = this.getUsers();
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx === -1) return { success: false, error: 'Usuário não encontrado.' };
+
+    const existing = users[idx];
+
+    // Check duplicate email
+    if (data.email && data.email.trim().toLowerCase() !== existing.email.toLowerCase()) {
+      const dup = users.find((u) => u.id !== userId && u.email.toLowerCase() === data.email!.trim().toLowerCase());
+      if (dup) return { success: false, error: 'Já existe outro usuário com este e-mail.' };
+    }
+
+    // Check duplicate username
+    if (data.username && data.username.trim().toLowerCase() !== (existing.username || '').toLowerCase()) {
+      const dup = users.find((u) => u.id !== userId && u.username && u.username.toLowerCase() === data.username!.trim().toLowerCase());
+      if (dup) return { success: false, error: 'Já existe outro usuário com este nome de usuário.' };
+    }
+
+    const updated: User = {
+      ...existing,
+      ...data,
+      name: data.name !== undefined ? data.name.trim() : existing.name,
+      email: data.email !== undefined ? data.email.trim().toLowerCase() : existing.email,
+      username: data.username !== undefined ? data.username.trim().toLowerCase() : existing.username,
+      password: data.password !== undefined && data.password !== '' ? data.password : existing.password,
+    };
+
+    users[idx] = updated;
+    this.setItem(STORAGE_KEYS.USERS, users);
+
+    const curr = this.getCurrentUser();
+    if (curr && curr.id === userId) {
+      this.setItem(STORAGE_KEYS.CURRENT_USER, updated);
+    }
+
+    this.addAuditLog('alteracao_lote', `Dados do usuário ${updated.name} atualizados com sucesso.`);
+    return { success: true, user: updated };
   }
 
   public toggleUserApproval(userId: string): { success: boolean; is_approved?: boolean; error?: string } {

@@ -70,7 +70,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   currentUser,
   onRefresh,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'companies' | 'users' | 'dashboards'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'companies' | 'users' | 'dashboards'>(
+    currentUser.role === 'superadmin' ? 'overview' : 'users'
+  );
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyFilter, setCompanyFilter] = useState<string>('all');
@@ -84,10 +86,20 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   // New User Form State
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [newUserName, setNewUserName] = useState('');
+  const [newUserUsername, setNewUserUsername] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('admin');
   const [newUserCompanyId, setNewUserCompanyId] = useState('');
+
+  // Edit User Form State
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserUsername, setEditUserUsername] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserPassword, setEditUserPassword] = useState('');
+  const [editUserRole, setEditUserRole] = useState<UserRole>('funcionario');
+  const [editUserCompanyId, setEditUserCompanyId] = useState('');
 
   // Company Form State
   const [isAddingCompany, setIsAddingCompany] = useState(false);
@@ -254,24 +266,69 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       return;
     }
 
+    const assignedCompanyId =
+      currentUser.role !== 'superadmin'
+        ? currentUser.company_id || 'comp-aquino'
+        : newUserCompanyId || currentUser.company_id || 'comp-aquino';
+
     const res = storage.registerUser({
       name: newUserName,
       email: newUserEmail,
+      username: newUserUsername || undefined,
       password: newUserPassword || '123456',
       role: newUserRole,
-      company_id: newUserCompanyId,
+      company_id: assignedCompanyId,
+      is_approved: true,
     });
 
     if (res.success) {
-      setFeedback({ type: 'success', message: `Usuário ${newUserName} cadastrado com sucesso!` });
+      setFeedback({ type: 'success', message: `Usuário ${newUserName} cadastrado com sucesso e liberado para login!` });
       setIsAddingUser(false);
       setNewUserName('');
+      setNewUserUsername('');
       setNewUserEmail('');
       setNewUserPassword('');
       loadData();
       onRefresh?.();
     } else {
       setFeedback({ type: 'error', message: res.error || 'Erro ao cadastrar usuário.' });
+    }
+  };
+
+  const handleStartEditUser = (u: User) => {
+    setEditingUser(u);
+    setEditUserName(u.name);
+    setEditUserUsername(u.username || '');
+    setEditUserEmail(u.email);
+    setEditUserPassword('');
+    setEditUserRole(u.role);
+    setEditUserCompanyId(u.company_id || '');
+  };
+
+  const handleUpdateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    if (!editUserName.trim() || !editUserEmail.trim()) {
+      setFeedback({ type: 'error', message: 'Preencha o nome e o e-mail do usuário.' });
+      return;
+    }
+
+    const res = storage.updateUserFull(editingUser.id, {
+      name: editUserName,
+      username: editUserUsername,
+      email: editUserEmail,
+      password: editUserPassword || undefined,
+      role: editUserRole,
+      company_id: editUserCompanyId || editingUser.company_id,
+    });
+
+    if (res.success) {
+      setFeedback({ type: 'success', message: `Usuário ${editUserName} atualizado com sucesso!` });
+      setEditingUser(null);
+      loadData();
+      onRefresh?.();
+    } else {
+      setFeedback({ type: 'error', message: res.error || 'Erro ao atualizar usuário.' });
     }
   };
 
@@ -397,6 +454,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const activeUsersCount = users.filter((u) => u.is_approved !== false && !u.is_blocked).length;
 
   const filteredUsers = users.filter((u) => {
+    if (currentUser.role !== 'superadmin' && currentUser.company_id) {
+      if (u.company_id && u.company_id !== currentUser.company_id) {
+        return false;
+      }
+    }
     const matchesCompany = companyFilter === 'all' || u.company_id === companyFilter;
     const matchesStatus =
       statusFilter === 'all'
@@ -411,7 +473,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     const matchesSearch =
       searchTerm.trim() === '' ||
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase());
+      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.username && u.username.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return matchesCompany && matchesStatus && matchesSearch;
   });
@@ -436,15 +499,24 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-black text-white tracking-tight">
-                Painel Superadmin Chronix ERP
+                {currentUser.role === 'superadmin' ? 'Painel Superadmin Chronix ERP' : 'Gestão de Usuários & Operadores'}
               </h2>
-              <span className="px-2.5 py-0.5 text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full flex items-center gap-1 uppercase tracking-wider">
-                <Crown className="w-3 h-3 text-amber-400" />
-                Controle Master
-              </span>
+              {currentUser.role === 'superadmin' ? (
+                <span className="px-2.5 py-0.5 text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full flex items-center gap-1 uppercase tracking-wider">
+                  <Crown className="w-3 h-3 text-amber-400" />
+                  Controle Master
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full flex items-center gap-1 uppercase tracking-wider">
+                  <Users className="w-3 h-3 text-emerald-400" />
+                  Acesso da Empresa
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-400 font-medium">
-              Gestão de Empresas, Aprovação de Clientes, Senhas & Exclusão de Acessos
+              {currentUser.role === 'superadmin'
+                ? 'Gestão de Empresas, Aprovação de Clientes, Senhas & Exclusão de Acessos'
+                : 'Crie, edite e gerencie os usuários e operadores autorizados para acessar o sistema'}
             </p>
           </div>
         </div>
@@ -465,7 +537,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               </div>
             </div>
 
-            {currentSelectedCompanyId && (
+            {currentSelectedCompanyId && currentUser.role === 'superadmin' && (
               <button
                 onClick={() => handleSelectCompanyView(null)}
                 className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-[10px] font-bold transition"
@@ -479,7 +551,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
           <button
             onClick={onClose}
             className="p-2.5 rounded-2xl bg-slate-800 hover:bg-rose-900/80 hover:text-white text-slate-300 transition border border-slate-700 flex items-center gap-1.5 font-bold text-xs"
-            title="Sair do Painel Superadmin"
+            title="Fechar Painel"
           >
             <X className="w-5 h-5" />
             <span className="hidden sm:inline">Fechar Painel</span>
@@ -490,26 +562,28 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       {/* FULLSCREEN NAVIGATION TABS */}
       <div className="bg-slate-900/90 border-b border-slate-800 px-6 flex items-center justify-between shrink-0 overflow-x-auto">
         <div className="flex gap-2">
-          {/* TAB 1: OVERVIEW / HOMEPAGE */}
-          <button
-            onClick={() => {
-              setActiveTab('overview');
-              setFeedback(null);
-            }}
-            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
-              activeTab === 'overview'
-                ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
-                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
-            }`}
-          >
-            <Crown className="w-4 h-4 text-amber-400" />
-            <span>Visão Geral & Clientes Pendentes</span>
-            {pendingUsers.length > 0 && (
-              <span className="px-2 py-0.5 text-[10px] font-black bg-amber-500 text-slate-950 rounded-full animate-pulse shadow-md">
-                {pendingUsers.length}
-              </span>
-            )}
-          </button>
+          {/* TAB 1: OVERVIEW / HOMEPAGE (Only Superadmin) */}
+          {currentUser.role === 'superadmin' && (
+            <button
+              onClick={() => {
+                setActiveTab('overview');
+                setFeedback(null);
+              }}
+              className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
+                activeTab === 'overview'
+                  ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
+                  : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span>Visão Geral & Clientes Pendentes</span>
+              {pendingUsers.length > 0 && (
+                <span className="px-2 py-0.5 text-[10px] font-black bg-amber-500 text-slate-950 rounded-full animate-pulse shadow-md">
+                  {pendingUsers.length}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* TAB 2: USERS & ACCESS */}
           <button
@@ -524,46 +598,51 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             }`}
           >
             <Users className="w-4 h-4 text-emerald-400" />
-            <span>Gestão de Usuários & Acessos ({users.length})</span>
+            <span>Gestão de Usuários & Operadores ({filteredUsers.length})</span>
           </button>
 
-          {/* TAB 3: COMPANIES & LOGOS */}
-          <button
-            onClick={() => {
-              setActiveTab('companies');
-              setFeedback(null);
-            }}
-            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
-              activeTab === 'companies'
-                ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
-                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
-            }`}
-          >
-            <Building2 className="w-4 h-4 text-cyan-400" />
-            <span>Empresas & Logotipos CNPJ ({companies.length})</span>
-          </button>
+          {/* TAB 3: COMPANIES & LOGOS (Only Superadmin) */}
+          {currentUser.role === 'superadmin' && (
+            <button
+              onClick={() => {
+                setActiveTab('companies');
+                setFeedback(null);
+              }}
+              className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
+                activeTab === 'companies'
+                  ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
+                  : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <Building2 className="w-4 h-4 text-cyan-400" />
+              <span>Empresas & Logotipos CNPJ ({companies.length})</span>
+            </button>
+          )}
 
-          {/* TAB 4: DASHBOARDS */}
-          <button
-            onClick={() => {
-              setActiveTab('dashboards');
-              setFeedback(null);
-            }}
-            className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
-              activeTab === 'dashboards'
-                ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
-                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4 text-blue-400" />
-            <span>Analytics & Métricas Globais</span>
-          </button>
+          {/* TAB 4: DASHBOARDS (Only Superadmin) */}
+          {currentUser.role === 'superadmin' && (
+            <button
+              onClick={() => {
+                setActiveTab('dashboards');
+                setFeedback(null);
+              }}
+              className={`py-3.5 px-5 text-xs font-black flex items-center gap-2 border-b-2 transition shrink-0 ${
+                activeTab === 'dashboards'
+                  ? 'border-cyan-400 text-cyan-300 bg-slate-950 rounded-t-2xl border-t border-x border-slate-800'
+                  : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-blue-400" />
+              <span>Analytics & Métricas Globais</span>
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2 py-2">
           <button
             onClick={() => {
               setIsAddingUser(true);
+              setEditingUser(null);
               setActiveTab('users');
             }}
             className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-md transition active:scale-95"
@@ -571,13 +650,15 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             <Plus className="w-4 h-4" />
             <span>Novo Usuário</span>
           </button>
-          <button
-            onClick={handleOpenNewCompany}
-            className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-md transition active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nova Empresa</span>
-          </button>
+          {currentUser.role === 'superadmin' && (
+            <button
+              onClick={handleOpenNewCompany}
+              className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-md transition active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nova Empresa</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -995,7 +1076,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h4 className="text-sm font-black text-emerald-400 uppercase tracking-wider flex items-center gap-2">
                     <Plus className="w-4 h-4" />
-                    <span>Cadastrar Novo Usuário no Sistema</span>
+                    <span>Cadastrar Novo Usuário / Operador</span>
                   </h4>
                   <button
                     type="button"
@@ -1006,7 +1087,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Nome Completo *</label>
                     <input
@@ -1016,6 +1097,17 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                       value={newUserName}
                       onChange={(e) => setNewUserName(e.target.value)}
                       className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Usuário (Login) *</label>
+                    <input
+                      type="text"
+                      placeholder="ex: carlos, vendedor1"
+                      value={newUserUsername}
+                      onChange={(e) => setNewUserUsername(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-emerald-300 font-mono font-bold outline-none focus:border-emerald-500"
                     />
                   </div>
 
@@ -1042,20 +1134,22 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Empresa *</label>
-                    <select
-                      value={newUserCompanyId}
-                      onChange={(e) => setNewUserCompanyId(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none cursor-pointer"
-                    >
-                      {companies.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {currentUser.role === 'superadmin' && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Empresa *</label>
+                      <select
+                        value={newUserCompanyId}
+                        onChange={(e) => setNewUserCompanyId(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none cursor-pointer"
+                      >
+                        {companies.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Perfil de Acesso *</label>
@@ -1065,8 +1159,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                       className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-amber-300 outline-none cursor-pointer"
                     >
                       <option value="admin">Administrador</option>
-                      <option value="funcionario">Funcionário</option>
-                      <option value="superadmin">Superadmin</option>
+                      <option value="funcionario">Funcionário / Vendedor</option>
+                      {currentUser.role === 'superadmin' && <option value="superadmin">Superadmin</option>}
                     </select>
                   </div>
                 </div>
@@ -1084,6 +1178,117 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                     className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg transition active:scale-95"
                   >
                     Salvar Usuário
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Form for Editing Existing User */}
+            {editingUser && (
+              <form onSubmit={handleUpdateUser} className="p-6 bg-slate-900 border border-amber-500/40 rounded-3xl space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h4 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                    <Edit2 className="w-4 h-4" />
+                    <span>Editar Usuário: {editingUser.name}</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="p-1 text-slate-400 hover:text-white rounded-lg bg-slate-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Nome Completo *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editUserName}
+                      onChange={(e) => setEditUserName(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Nome de Usuário (Login)</label>
+                    <input
+                      type="text"
+                      placeholder="ex: carlos, vendedor1"
+                      value={editUserUsername}
+                      onChange={(e) => setEditUserUsername(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-amber-300 font-mono font-bold outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">E-mail *</label>
+                    <input
+                      type="email"
+                      required
+                      value={editUserEmail}
+                      onChange={(e) => setEditUserEmail(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Nova Senha (opcional)</label>
+                    <input
+                      type="password"
+                      placeholder="Deixe em branco para manter"
+                      value={editUserPassword}
+                      onChange={(e) => setEditUserPassword(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  {currentUser.role === 'superadmin' && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Empresa *</label>
+                      <select
+                        value={editUserCompanyId}
+                        onChange={(e) => setEditUserCompanyId(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-bold outline-none cursor-pointer"
+                      >
+                        {companies.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Perfil *</label>
+                    <select
+                      value={editUserRole}
+                      onChange={(e) => setEditUserRole(e.target.value as UserRole)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-amber-300 outline-none cursor-pointer"
+                    >
+                      <option value="admin">Administrador</option>
+                      <option value="funcionario">Funcionário / Vendedor</option>
+                      {currentUser.role === 'superadmin' && <option value="superadmin">Superadmin</option>}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-700 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg transition active:scale-95"
+                  >
+                    Salvar Alterações
                   </button>
                 </div>
               </form>
@@ -1129,6 +1334,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                                   )}
                                   <div>
                                     <span className="block text-sm text-white font-extrabold">{u.name}</span>
+                                    {u.username && (
+                                      <span className="block text-[11px] font-mono text-emerald-400 font-bold">
+                                        @{u.username}
+                                      </span>
+                                    )}
                                     {isMainSuper && <span className="text-[10px] text-amber-400 font-bold">Superadmin Principal</span>}
                                   </div>
                                 </div>
@@ -1229,6 +1439,15 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                                       title="Redefinir Senha"
                                     >
                                       <KeyRound className="w-4 h-4" />
+                                    </button>
+
+                                    {/* Botão de Editar Usuário */}
+                                    <button
+                                      onClick={() => handleStartEditUser(u)}
+                                      className="p-1.5 bg-slate-800 hover:bg-amber-950 text-amber-300 border border-slate-700 hover:border-amber-700 rounded-xl text-xs font-bold transition"
+                                      title="Editar Dados do Usuário"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
                                     </button>
 
                                     {/* Botão de Excluir Usuário */}
