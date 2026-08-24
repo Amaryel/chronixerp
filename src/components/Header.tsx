@@ -19,6 +19,7 @@ import {
   HelpCircle,
   LifeBuoy,
   ArrowLeft,
+  Menu,
 } from 'lucide-react';
 import { User, Company } from '../types';
 import { SUPERADMIN_EMAIL, chronixLogoImg } from '../services/storage';
@@ -28,6 +29,7 @@ interface HeaderProps {
   activeCompany?: Company;
   companies?: Company[];
   onSelectCompany?: (companyId: string) => void;
+  onOpenSidebar?: () => void;
   onOpenSupabaseModal: () => void;
   onOpenUserManagement?: () => void;
   onOpenProfileModal: () => void;
@@ -47,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeCompany,
   companies = [],
   onSelectCompany,
+  onOpenSidebar,
   onOpenSupabaseModal,
   onOpenUserManagement,
   onOpenProfileModal,
@@ -90,38 +93,50 @@ export const Header: React.FC<HeaderProps> = ({
 
       <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 py-3 transition-colors">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
-          {/* Brand logo & Title */}
-          <button
-            onClick={onBrandClick}
-            className="flex items-center gap-3 text-left group transition hover:opacity-90 active:scale-98"
-            title="Clique para ir à Tela Inicial (Início)"
-          >
-            <img
-              src={companyLogo}
-              alt={companyDisplayName}
-              className="w-10 h-10 rounded-xl object-contain shadow-md shadow-blue-500/20 border border-blue-400/30 group-hover:scale-105 transition bg-slate-950/80 p-0.5"
-              referrerPolicy="no-referrer"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white leading-none group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
-                  {companyDisplayName}
-                </h1>
-                <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800 uppercase tracking-wider">
-                  Chronix ERP
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
-                {activeCompany?.document ? (
-                  <span className="font-mono font-semibold text-blue-600 dark:text-cyan-400">
-                    CNPJ: {activeCompany.document}
+          {/* Brand logo & Title + Sidebar Hamburger Toggle */}
+          <div className="flex items-center gap-2.5">
+            {onOpenSidebar && (
+              <button
+                onClick={onOpenSidebar}
+                className="p-2 rounded-xl text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition flex items-center justify-center shrink-0 active:scale-95 shadow-sm"
+                title="Abrir Menu Lateral de Navegação"
+              >
+                <Menu className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </button>
+            )}
+
+            <button
+              onClick={onBrandClick}
+              className="flex items-center gap-3 text-left group transition hover:opacity-90 active:scale-98"
+              title="Clique para ir à Tela Inicial (Início)"
+            >
+              <img
+                src={companyLogo}
+                alt={companyDisplayName}
+                className="w-10 h-10 rounded-xl object-contain shadow-md shadow-blue-500/20 border border-blue-400/30 group-hover:scale-105 transition bg-slate-950/80 p-0.5"
+                referrerPolicy="no-referrer"
+              />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white leading-none group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
+                    {companyDisplayName}
+                  </h1>
+                  <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800 uppercase tracking-wider">
+                    Chronix ERP
                   </span>
-                ) : (
-                  <span>Gestão Inteligente • Resultados Reais</span>
-                )}
-              </p>
-            </div>
-          </button>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
+                  {activeCompany?.document ? (
+                    <span className="font-mono font-semibold text-blue-600 dark:text-cyan-400">
+                      CNPJ: {activeCompany.document}
+                    </span>
+                  ) : (
+                    <span>Gestão Inteligente • Resultados Reais</span>
+                  )}
+                </p>
+              </div>
+            </button>
+          </div>
 
           {/* Action Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2.5">

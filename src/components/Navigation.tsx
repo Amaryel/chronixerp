@@ -22,6 +22,7 @@ import {
   ArrowRightLeft,
   CheckCircle2,
   Truck,
+  Menu,
 } from 'lucide-react';
 
 export type NavTab =
@@ -46,12 +47,14 @@ interface NavigationProps {
   setActiveTab: (tab: NavTab) => void;
   lowStockCount: number;
   expiringCount: number;
+  onOpenSidebar?: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
   activeTab,
   setActiveTab,
   lowStockCount,
+  onOpenSidebar,
 }) => {
   const [cadastrosOpen, setCadastrosOpen] = useState(false);
   const [movimentacoesOpen, setMovimentacoesOpen] = useState(false);
@@ -409,6 +412,17 @@ export const Navigation: React.FC<NavigationProps> = ({
             <FileSpreadsheet className="w-5 h-5 mb-0.5 text-indigo-500" />
             <span>Relatórios</span>
           </button>
+
+          {/* Menu Lateral Hamburger Drawer Button */}
+          {onOpenSidebar && (
+            <button
+              onClick={onOpenSidebar}
+              className="flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-black transition min-w-[50px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60"
+            >
+              <Menu className="w-5 h-5 mb-0.5 text-blue-600 dark:text-blue-400" />
+              <span>Menu</span>
+            </button>
+          )}
         </div>
       </nav>
     </>

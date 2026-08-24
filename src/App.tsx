@@ -30,6 +30,7 @@ import { SupportModal } from './components/SupportModal';
 import { ContextHelpDrawer } from './components/ContextHelpDrawer';
 import { GuidedTourModal } from './components/GuidedTourModal';
 import { HelpCenter } from './components/HelpCenter';
+import { SidebarDrawer } from './components/SidebarDrawer';
 
 import { Product, Batch, Movement, Category, Supplier, User, Company } from './types';
 import { storage, SUPERADMIN_EMAIL } from './services/storage';
@@ -69,6 +70,7 @@ export default function App() {
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isContextHelpOpen, setIsContextHelpOpen] = useState(false);
   const [isGuidedTourOpen, setIsGuidedTourOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Sync state from storage
   const loadState = () => {
@@ -192,6 +194,7 @@ export default function App() {
           storage.setSuperadminSelectedCompanyId(compId);
           loadState();
         }}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
         onOpenUserManagement={() => setIsUserManagementModalOpen(true)}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
@@ -218,6 +221,7 @@ export default function App() {
         setActiveTab={handleSelectTab}
         lowStockCount={lowStockCount}
         expiringCount={expiringCount}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
       />
 
       {/* PWA Installation Banner */}
@@ -421,6 +425,31 @@ export default function App() {
         currentUser={currentUser}
         onRefresh={loadState}
       />
+
+      {/* Responsive Navigation Sidebar Drawer (Mobile & Tablet) */}
+      {isSidebarOpen && (
+        <SidebarDrawer
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          activeTab={activeTab}
+          setActiveTab={handleSelectTab}
+          currentUser={currentUser}
+          activeCompany={activeCompany}
+          lowStockCount={lowStockCount}
+          expiringCount={expiringCount}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          onOpenProfileModal={() => setIsProfileModalOpen(true)}
+          onOpenUserManagement={() => setIsUserManagementModalOpen(true)}
+          onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+          onOpenContextHelp={() => setIsContextHelpOpen(true)}
+          onOpenSupport={() => setIsSupportModalOpen(true)}
+          onLogout={() => {
+            storage.logout();
+            loadState();
+          }}
+        />
+      )}
     </div>
   );
 }

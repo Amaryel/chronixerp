@@ -76,21 +76,26 @@ export async function testSupabaseConnection(url: string, key: string): Promise<
  * Complete SQL Migration script for Supabase Database
  * Users can execute this in their Supabase SQL Editor
  */
-export const SUPABASE_HEARTBEAT_SQL = `-- AQUINOS FRIOS - MANTER SUPABASE ATIVO (HEARTBEAT SERVER-SIDE)
--- Este script configura uma função agendada que executa automaticamente no PostgreSQL do Supabase,
--- garantindo que o banco permaneça ativo sem depender de navegação, PWA ou computadores ligados.
+export const SUPABASE_HEARTBEAT_SQL = `-- ==============================================================================
+-- AQUINOS FRIOS - MANTER SUPABASE ATIVO SEM DEPENDER DE USUÁRIOS (SERVER-SIDE CRON)
+-- ==============================================================================
+-- Este script configura o agendador nativo (pg_cron) diretamente no PostgreSQL do Supabase.
+-- Ele executa automaticamente mesmo com:
+--  • Usuários online: 0
+--  • PWA aberto: NÃO
+--  • Computadores ligados: NÃO
+-- ==============================================================================
 
--- 1. Habilita a extensão pg_cron (se disponível no seu projeto Supabase)
+-- 1. Habilitar a extensão oficial pg_cron
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
--- 2. Tabela técnica de monitoramento (isolada e invisível para telas comerciais)
+-- 2. Tabela técnica leve para monitoramento de status
 CREATE TABLE IF NOT EXISTS system_heartbeat (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   last_execution TIMESTAMPTZ DEFAULT NOW(),
   status TEXT DEFAULT 'active'
 );
 
--- Habilita RLS para proteção de dados
 ALTER TABLE system_heartbeat ENABLE ROW LEVEL SECURITY;
 
 DO $$
@@ -102,14 +107,14 @@ BEGIN
   END IF;
 END $$;
 
--- 3. Função do servidor que confirma atividade leve sem alterar dados operacionais
-CREATE OR REPLACE FUNCTION keep_supabase_alive()
+-- 3. Função oficial do servidor (NÃO altera estoque, vendas, clientes ou usuários)
+CREATE OR REPLACE FUNCTION public.keep_project_alive()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  -- Atualiza o registro de verificação no sistema (sem alterar estoque, vendas ou usuários)
+  -- Atualiza o registro de atividade técnica do banco de dados
   INSERT INTO system_heartbeat (id, last_execution, status)
   VALUES ('00000000-0000-0000-0000-000000000001'::uuid, NOW(), 'active')
   ON CONFLICT (id) DO UPDATE
@@ -117,27 +122,51 @@ BEGIN
 END;
 $$;
 
--- 4. Agendamento automático via pg_cron (Rodando 1x por dia às 03:00 UTC)
+-- Compatibilidade com chamadas legadas
+CREATE OR REPLACE FUNCTION public.keep_supabase_alive()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  PERFORM public.keep_project_alive();
+END;
+$$;
+
+-- 4. Agendamento automático via pg_cron (Execução periódica: 06:00 e 18:00 UTC)
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-    -- Remove agendamento antigo se existir
+    -- Desagenda jobs anteriores caso existam
+    PERFORM cron.unschedule('aquinos_frios_keepalive')
+    WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'aquinos_frios_keepalive');
+
     PERFORM cron.unschedule('keep-supabase-alive-job')
     WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'keep-supabase-alive-job');
 
-    -- Agenda execução diária leve
+    -- Cria o agendamento seguro e permanente
     PERFORM cron.schedule(
-      'keep-supabase-alive-job',
-      '0 3 * * *',
-      'SELECT keep_supabase_alive();'
+      'aquinos_frios_keepalive',
+      '0 6,18 * * *',
+      'SELECT public.keep_project_alive();'
     );
   END IF;
 EXCEPTION WHEN OTHERS THEN
   NULL;
 END $$;
 
--- 5. Executa imediatamente a primeira vez para inicializar o registro
-SELECT keep_supabase_alive();
+-- 5. Executa imediatamente uma vez para validar e registrar a primeira atividade
+SELECT public.keep_project_alive();
+
+-- ==============================================================================
+-- CONSULTAS PARA MONITORAMENTO DIRETO NO SUPABASE SQL EDITOR:
+-- ==============================================================================
+-- 1. Ver se o Job está ativo:
+--    SELECT jobid, jobname, schedule, active, command FROM cron.job;
+--
+-- 2. Ver o histórico das últimas execuções:
+--    SELECT jobid, runid, status, return_message, start_time, end_time FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;
+-- ==============================================================================
 `;
 
 export const SUPABASE_SQL_SCHEMA = `-- AQUINOS FRIOS - DATABASE SCHEMA FOR SUPABASE
