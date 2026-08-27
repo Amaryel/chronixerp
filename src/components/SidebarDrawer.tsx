@@ -36,7 +36,7 @@ import {
   BarChart2,
 } from 'lucide-react';
 import { NavTab } from './Navigation';
-import { User, Company } from '../types';
+import { User, Company, isUserAuthorizedForModule } from '../types';
 import { SUPERADMIN_EMAIL, chronixLogoImg } from '../services/storage';
 
 interface SidebarDrawerProps {
@@ -208,245 +208,288 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
           )}
 
           {/* SECTION 1: DADOS PRINCIPAIS */}
-          <div>
-            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500 px-2 mb-1.5">
-              Geral & Vendas
-            </span>
-            <div className="space-y-1">
-              <button
-                onClick={() => handleNavigate('dashboard')}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition ${
-                  activeTab === 'dashboard'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <LayoutDashboard className="w-4 h-4 text-blue-400" />
-                  <span>Início / Visão Geral</span>
-                </div>
-              </button>
+          {(isUserAuthorizedForModule(currentUser, 'dashboard') ||
+            isUserAuthorizedForModule(currentUser, 'venda_rapida') ||
+            isUserAuthorizedForModule(currentUser, 'carga_vendedor')) && (
+            <div>
+              <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500 px-2 mb-1.5">
+                Geral & Vendas
+              </span>
+              <div className="space-y-1">
+                {isUserAuthorizedForModule(currentUser, 'dashboard') && (
+                  <button
+                    onClick={() => handleNavigate('dashboard')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition ${
+                      activeTab === 'dashboard'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <LayoutDashboard className="w-4 h-4 text-blue-400" />
+                      <span>Início / Visão Geral</span>
+                    </div>
+                  </button>
+                )}
 
-              <button
-                onClick={() => handleNavigate('venda_rapida')}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition ${
-                  activeTab === 'venda_rapida'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <ShoppingCart className="w-4 h-4 text-emerald-400" />
-                  <span>Frente de Caixa (PDV)</span>
-                </div>
-              </button>
+                {isUserAuthorizedForModule(currentUser, 'venda_rapida') && (
+                  <button
+                    onClick={() => handleNavigate('venda_rapida')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition ${
+                      activeTab === 'venda_rapida'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <ShoppingCart className="w-4 h-4 text-emerald-400" />
+                      <span>Frente de Caixa (PDV)</span>
+                    </div>
+                  </button>
+                )}
 
-              <button
-                onClick={() => handleNavigate('carga_vendedor')}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition ${
-                  activeTab === 'carga_vendedor'
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Truck className="w-4 h-4 text-emerald-400" />
-                  <span>Rota de Vendas (Carga)</span>
-                </div>
-              </button>
+                {isUserAuthorizedForModule(currentUser, 'carga_vendedor') && (
+                  <button
+                    onClick={() => handleNavigate('carga_vendedor')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition ${
+                      activeTab === 'carga_vendedor'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Truck className="w-4 h-4 text-emerald-400" />
+                      <span>Rota de Vendas (Carga)</span>
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* SECTION 2: CADASTROS */}
-          <div>
-            <button
-              onClick={() => setCadastrosExpanded(!cadastrosExpanded)}
-              className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-500 px-2 mb-1.5 hover:text-slate-300 transition"
-            >
-              <span>Cadastros Base</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform ${
-                  cadastrosExpanded ? '' : '-rotate-90'
-                }`}
-              />
-            </button>
-
-            {cadastrosExpanded && (
-              <div className="space-y-1 pl-1">
-                <button
-                  onClick={() => handleNavigate('customers')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
-                    activeTab === 'customers'
-                      ? 'bg-blue-600 text-white font-extrabold'
-                      : 'text-slate-300 hover:bg-slate-800'
+          {(isUserAuthorizedForModule(currentUser, 'customers') ||
+            isUserAuthorizedForModule(currentUser, 'drivers') ||
+            isUserAuthorizedForModule(currentUser, 'products') ||
+            isUserAuthorizedForModule(currentUser, 'bulk_prices')) && (
+            <div>
+              <button
+                onClick={() => setCadastrosExpanded(!cadastrosExpanded)}
+                className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-500 px-2 mb-1.5 hover:text-slate-300 transition"
+              >
+                <span>Cadastros Base</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform ${
+                    cadastrosExpanded ? '' : '-rotate-90'
                   }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Users className="w-4 h-4 text-emerald-400" />
-                    <span>Clientes & Parceiros</span>
-                  </div>
-                </button>
+                />
+              </button>
 
-                <button
-                  onClick={() => handleNavigate('drivers')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
-                    activeTab === 'drivers'
-                      ? 'bg-blue-600 text-white font-extrabold'
-                      : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Truck className="w-4 h-4 text-blue-400" />
-                    <span>Motoristas & Entregadores</span>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleNavigate('products')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
-                    activeTab === 'products'
-                      ? 'bg-blue-600 text-white font-extrabold'
-                      : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Package className="w-4 h-4 text-cyan-400" />
-                    <span>Produtos & Estoque</span>
-                  </div>
-                  {lowStockCount > 0 && (
-                    <span className="px-1.5 py-0.5 text-[10px] bg-amber-500 text-slate-950 font-black rounded-full">
-                      {lowStockCount}
-                    </span>
+              {cadastrosExpanded && (
+                <div className="space-y-1 pl-1">
+                  {isUserAuthorizedForModule(currentUser, 'customers') && (
+                    <button
+                      onClick={() => handleNavigate('customers')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
+                        activeTab === 'customers'
+                          ? 'bg-blue-600 text-white font-extrabold'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Users className="w-4 h-4 text-emerald-400" />
+                        <span>Clientes & Parceiros</span>
+                      </div>
+                    </button>
                   )}
-                </button>
 
-                <button
-                  onClick={() => handleNavigate('bulk_prices')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
-                    activeTab === 'bulk_prices'
-                      ? 'bg-blue-600 text-white font-extrabold'
-                      : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Percent className="w-4 h-4 text-amber-400" />
-                    <span>Alteração de Preços em Massa</span>
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
+                  {isUserAuthorizedForModule(currentUser, 'drivers') && (
+                    <button
+                      onClick={() => handleNavigate('drivers')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
+                        activeTab === 'drivers'
+                          ? 'bg-blue-600 text-white font-extrabold'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Truck className="w-4 h-4 text-blue-400" />
+                        <span>Motoristas & Entregadores</span>
+                      </div>
+                    </button>
+                  )}
+
+                  {isUserAuthorizedForModule(currentUser, 'products') && (
+                    <button
+                      onClick={() => handleNavigate('products')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
+                        activeTab === 'products'
+                          ? 'bg-blue-600 text-white font-extrabold'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Package className="w-4 h-4 text-cyan-400" />
+                        <span>Produtos & Estoque</span>
+                      </div>
+                      {lowStockCount > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] bg-amber-500 text-slate-950 font-black rounded-full">
+                          {lowStockCount}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {isUserAuthorizedForModule(currentUser, 'bulk_prices') && (
+                    <button
+                      onClick={() => handleNavigate('bulk_prices')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
+                        activeTab === 'bulk_prices'
+                          ? 'bg-blue-600 text-white font-extrabold'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Percent className="w-4 h-4 text-amber-400" />
+                        <span>Alteração de Preços em Massa</span>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* SECTION 3: MOVIMENTAÇÕES & ESTOQUE */}
-          <div>
-            <button
-              onClick={() => setMovimentacoesExpanded(!movimentacoesExpanded)}
-              className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-500 px-2 mb-1.5 hover:text-slate-300 transition"
-            >
-              <span>Movimentações & Financeiro</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform ${
-                  movimentacoesExpanded ? '' : '-rotate-90'
-                }`}
-              />
-            </button>
-
-            {movimentacoesExpanded && (
-              <div className="space-y-1 pl-1">
-                <button
-                  onClick={() => handleNavigate('entries')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
-                    activeTab === 'entries'
-                      ? 'bg-emerald-600 text-white font-extrabold'
-                      : 'text-slate-300 hover:bg-slate-800'
+          {(isUserAuthorizedForModule(currentUser, 'entries') ||
+            isUserAuthorizedForModule(currentUser, 'exits') ||
+            isUserAuthorizedForModule(currentUser, 'fiados') ||
+            isUserAuthorizedForModule(currentUser, 'bulk_stock')) && (
+            <div>
+              <button
+                onClick={() => setMovimentacoesExpanded(!movimentacoesExpanded)}
+                className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-500 px-2 mb-1.5 hover:text-slate-300 transition"
+              >
+                <span>Movimentações & Financeiro</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform ${
+                    movimentacoesExpanded ? '' : '-rotate-90'
                   }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
-                    <span>Entrada de Estoque</span>
-                  </div>
-                </button>
+                />
+              </button>
 
-                <button
-                  onClick={() => handleNavigate('exits')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
-                    activeTab === 'exits'
-                      ? 'bg-rose-600 text-white font-extrabold'
-                      : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <ArrowUpRight className="w-4 h-4 text-rose-400" />
-                    <span>Saída / Pré-Venda</span>
-                  </div>
-                </button>
+              {movimentacoesExpanded && (
+                <div className="space-y-1 pl-1">
+                  {isUserAuthorizedForModule(currentUser, 'entries') && (
+                    <button
+                      onClick={() => handleNavigate('entries')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
+                        activeTab === 'entries'
+                          ? 'bg-emerald-600 text-white font-extrabold'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+                        <span>Entrada de Estoque</span>
+                      </div>
+                    </button>
+                  )}
 
-                <button
-                  onClick={() => handleNavigate('fiados')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
-                    activeTab === 'fiados'
-                      ? 'bg-blue-600 text-white font-extrabold'
-                      : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <BookOpenCheck className="w-4 h-4 text-amber-400" />
-                    <span>Contas a Receber (Fiados)</span>
-                  </div>
-                </button>
+                  {isUserAuthorizedForModule(currentUser, 'exits') && (
+                    <button
+                      onClick={() => handleNavigate('exits')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
+                        activeTab === 'exits'
+                          ? 'bg-rose-600 text-white font-extrabold'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <ArrowUpRight className="w-4 h-4 text-rose-400" />
+                        <span>Saída / Pré-Venda</span>
+                      </div>
+                    </button>
+                  )}
 
-                <button
-                  onClick={() => handleNavigate('bulk_stock')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
-                    activeTab === 'bulk_stock'
-                      ? 'bg-blue-600 text-white font-extrabold'
-                      : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Boxes className="w-4 h-4 text-purple-400" />
-                    <span>Ajuste de Estoque em Lote</span>
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
+                  {isUserAuthorizedForModule(currentUser, 'fiados') && (
+                    <button
+                      onClick={() => handleNavigate('fiados')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
+                        activeTab === 'fiados'
+                          ? 'bg-blue-600 text-white font-extrabold'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <BookOpenCheck className="w-4 h-4 text-amber-400" />
+                        <span>Contas a Receber (Fiados)</span>
+                      </div>
+                    </button>
+                  )}
+
+                  {isUserAuthorizedForModule(currentUser, 'bulk_stock') && (
+                    <button
+                      onClick={() => handleNavigate('bulk_stock')}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
+                        activeTab === 'bulk_stock'
+                          ? 'bg-blue-600 text-white font-extrabold'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Boxes className="w-4 h-4 text-purple-400" />
+                        <span>Ajuste de Estoque em Lote</span>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* SECTION 4: RELATÓRIOS & AUDITORIA */}
-          <div>
-            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500 px-2 mb-1.5">
-              Análise & Histórico
-            </span>
-            <div className="space-y-1">
-              <button
-                onClick={() => handleNavigate('reports')}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition ${
-                  activeTab === 'reports'
-                    ? 'bg-blue-600 text-white font-extrabold'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <FileSpreadsheet className="w-4 h-4 text-indigo-400" />
-                  <span>Relatórios Gerenciais</span>
-                </div>
-              </button>
+          {(isUserAuthorizedForModule(currentUser, 'reports') ||
+            isUserAuthorizedForModule(currentUser, 'history')) && (
+            <div>
+              <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500 px-2 mb-1.5">
+                Análise & Histórico
+              </span>
+              <div className="space-y-1">
+                {isUserAuthorizedForModule(currentUser, 'reports') && (
+                  <button
+                    onClick={() => handleNavigate('reports')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                      activeTab === 'reports'
+                        ? 'bg-blue-600 text-white font-extrabold'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileSpreadsheet className="w-4 h-4 text-indigo-400" />
+                      <span>Relatórios Gerenciais</span>
+                    </div>
+                  </button>
+                )}
 
-              <button
-                onClick={() => handleNavigate('history')}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition ${
-                  activeTab === 'history'
-                    ? 'bg-blue-600 text-white font-extrabold'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Clock className="w-4 h-4 text-slate-400" />
-                  <span>Histórico de Vendas & Operações</span>
-                </div>
-              </button>
+                {isUserAuthorizedForModule(currentUser, 'history') && (
+                  <button
+                    onClick={() => handleNavigate('history')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                      activeTab === 'history'
+                        ? 'bg-blue-600 text-white font-extrabold'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Clock className="w-4 h-4 text-slate-400" />
+                      <span>Histórico de Vendas & Operações</span>
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* SECTION 5: AJUDA & UTILITÁRIOS */}
           <div>
@@ -454,33 +497,37 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
               Suporte & Ajustes
             </span>
             <div className="space-y-1">
-              <button
-                onClick={() => handleNavigate('settings')}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition ${
-                  activeTab === 'settings'
-                    ? 'bg-blue-600 text-white font-extrabold'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Settings className="w-4 h-4 text-slate-400" />
-                  <span>Configurações do Sistema</span>
-                </div>
-              </button>
+              {isUserAuthorizedForModule(currentUser, 'settings') && (
+                <button
+                  onClick={() => handleNavigate('settings')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                    activeTab === 'settings'
+                      ? 'bg-blue-600 text-white font-extrabold'
+                      : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Settings className="w-4 h-4 text-slate-400" />
+                    <span>Configurações do Sistema</span>
+                  </div>
+                </button>
+              )}
 
-              <button
-                onClick={() => handleNavigate('help_center')}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition ${
-                  activeTab === 'help_center'
-                    ? 'bg-blue-600 text-white font-extrabold'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <HelpCircle className="w-4 h-4 text-blue-400" />
-                  <span>Centro de Ajuda & Tutoriais</span>
-                </div>
-              </button>
+              {isUserAuthorizedForModule(currentUser, 'help_center') && (
+                <button
+                  onClick={() => handleNavigate('help_center')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                    activeTab === 'help_center'
+                      ? 'bg-blue-600 text-white font-extrabold'
+                      : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <HelpCircle className="w-4 h-4 text-blue-400" />
+                    <span>Centro de Ajuda & Tutoriais</span>
+                  </div>
+                </button>
+              )}
 
               {onOpenContextHelp && (
                 <button

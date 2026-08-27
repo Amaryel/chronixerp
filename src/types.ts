@@ -4,6 +4,23 @@
 
 export type UserRole = 'superadmin' | 'admin' | 'funcionario';
 
+export type NavTab =
+  | 'dashboard'
+  | 'products'
+  | 'customers'
+  | 'drivers'
+  | 'entries'
+  | 'exits'
+  | 'venda_rapida'
+  | 'fiados'
+  | 'bulk_stock'
+  | 'carga_vendedor'
+  | 'reports'
+  | 'history'
+  | 'settings'
+  | 'bulk_prices'
+  | 'help_center';
+
 export interface Company {
   id: string;
   name: string;
@@ -34,6 +51,7 @@ export interface User {
   password?: string;
   is_blocked?: boolean;
   avatar?: string;
+  allowed_modules?: NavTab[]; // Granular module-level access permissions
   created_at: string;
 }
 
@@ -547,5 +565,192 @@ export interface SellerLoad {
   created_at: string;
   updated_at?: string;
 }
+
+export interface SystemModuleInfo {
+  id: NavTab;
+  label: string;
+  shortLabel: string;
+  category: 'Geral' | 'Vendas & Operações' | 'Cadastros' | 'Estoque' | 'Financeiro' | 'Gestão & Configurações';
+  icon: string;
+  description: string;
+}
+
+export const SYSTEM_MODULES: SystemModuleInfo[] = [
+  // Geral
+  {
+    id: 'dashboard',
+    label: 'Início / Dashboard Geral',
+    shortLabel: 'Início',
+    category: 'Geral',
+    icon: 'LayoutDashboard',
+    description: 'Painel com visão geral, resumo do dia, atalhos rápidos e alertas.',
+  },
+  // Vendas & Operações
+  {
+    id: 'carga_vendedor',
+    label: 'Rota de Vendas (Carga do Vendedor)',
+    shortLabel: 'Rota de Vendas',
+    category: 'Vendas & Operações',
+    icon: 'Truck',
+    description: 'Montagem de carga de caminhão/van, vendas em rota e prestação de contas.',
+  },
+  {
+    id: 'venda_rapida',
+    label: 'Frente de Caixa (PDV)',
+    shortLabel: 'PDV',
+    category: 'Vendas & Operações',
+    icon: 'ShoppingCart',
+    description: 'Ponto de venda rápido, vendas balcão e emissão de comprovantes.',
+  },
+  {
+    id: 'exits',
+    label: 'Pré-Venda / Saída de Pedidos',
+    shortLabel: 'Pré-Venda',
+    category: 'Vendas & Operações',
+    icon: 'ArrowUpRight',
+    description: 'Criação e consulta de pedidos de pré-venda e saídas.',
+  },
+  // Financeiro
+  {
+    id: 'fiados',
+    label: 'Contas a Receber (Fiados & Crediário)',
+    shortLabel: 'Contas a Receber',
+    category: 'Financeiro',
+    icon: 'BookOpenCheck',
+    description: 'Gestão de vendas a prazo, parcelamentos, cobranças e baixas.',
+  },
+  // Cadastros
+  {
+    id: 'customers',
+    label: 'Clientes & Parceiros',
+    shortLabel: 'Clientes',
+    category: 'Cadastros',
+    icon: 'Users',
+    description: 'Cadastro, busca, limites de crédito e contatos de clientes.',
+  },
+  {
+    id: 'drivers',
+    label: 'Motoristas & Entregadores',
+    shortLabel: 'Motoristas',
+    category: 'Cadastros',
+    icon: 'Truck',
+    description: 'Cadastro de condutores, veículos e placas de entrega.',
+  },
+  {
+    id: 'products',
+    label: 'Produtos & Catálogo',
+    shortLabel: 'Produtos',
+    category: 'Cadastros',
+    icon: 'Package',
+    description: 'Catálogo de itens, unidades de medida, preços e custos.',
+  },
+  {
+    id: 'bulk_prices',
+    label: 'Alteração de Preços em Massa',
+    shortLabel: 'Tabela de Preços',
+    category: 'Cadastros',
+    icon: 'Percent',
+    description: 'Reajuste ágil em lote de preços de venda e margens de lucro.',
+  },
+  // Estoque
+  {
+    id: 'entries',
+    label: 'Entradas de Estoque / XML NF-e',
+    shortLabel: 'Entradas de Estoque',
+    category: 'Estoque',
+    icon: 'ArrowDownLeft',
+    description: 'Lançamento de compras manuais e importação automática de XML de NF-e.',
+  },
+  {
+    id: 'bulk_stock',
+    label: 'Ajuste de Estoque em Lote (Balanço)',
+    shortLabel: 'Ajuste de Estoque',
+    category: 'Estoque',
+    icon: 'Boxes',
+    description: 'Contagem física, inventário e acerto de divergências de estoque.',
+  },
+  // Gestão & Configurações
+  {
+    id: 'reports',
+    label: 'Relatórios Gerenciais',
+    shortLabel: 'Relatórios',
+    category: 'Gestão & Configurações',
+    icon: 'FileSpreadsheet',
+    description: 'Relatórios de lucratividade, histórico financeiro e curva ABC.',
+  },
+  {
+    id: 'history',
+    label: 'Histórico & Auditoria',
+    shortLabel: 'Auditoria',
+    category: 'Gestão & Configurações',
+    icon: 'Clock',
+    description: 'Registro cronológico de todas as operações e acessos no sistema.',
+  },
+  {
+    id: 'settings',
+    label: 'Configurações do Sistema',
+    shortLabel: 'Configurações',
+    category: 'Gestão & Configurações',
+    icon: 'Settings',
+    description: 'Parâmetros operacionais, estoque negativo e regras do ERP.',
+  },
+  {
+    id: 'help_center',
+    label: 'Centro de Ajuda & Tutoriais',
+    shortLabel: 'Ajuda',
+    category: 'Gestão & Configurações',
+    icon: 'HelpCircle',
+    description: 'Manuais passo a passo e documentação de uso do sistema.',
+  },
+];
+
+export const ALL_NAV_TAB_IDS: NavTab[] = SYSTEM_MODULES.map((m) => m.id);
+
+/**
+ * Returns the list of NavTabs accessible by a user.
+ * - Superadmins always have access to ALL modules.
+ * - If user has `allowed_modules` specified and non-empty, returns only those modules.
+ * - If not specified, default to ALL modules.
+ */
+export function getUserAllowedModules(user: User | null): NavTab[] {
+  if (!user) return ALL_NAV_TAB_IDS;
+  if (user.role === 'superadmin' || user.email?.toLowerCase() === 'amaryelcc@gmail.com') {
+    return ALL_NAV_TAB_IDS;
+  }
+  if (Array.isArray(user.allowed_modules) && user.allowed_modules.length > 0) {
+    return user.allowed_modules;
+  }
+  // Default for users without explicit restrictions: full access
+  return ALL_NAV_TAB_IDS;
+}
+
+/**
+ * Checks whether a user has permission to view a specific module.
+ */
+export function isUserAuthorizedForModule(user: User | null, tab: NavTab): boolean {
+  if (!user) return true;
+  if (user.role === 'superadmin' || user.email?.toLowerCase() === 'amaryelcc@gmail.com') {
+    return true;
+  }
+  const allowed = getUserAllowedModules(user);
+  return allowed.includes(tab);
+}
+
+/**
+ * Determines the primary default landing tab for a logged-in user.
+ * E.g. if the user only has 'carga_vendedor', opens directly in 'carga_vendedor'.
+ */
+export function getDefaultTabForUser(user: User | null): NavTab {
+  if (!user) return 'dashboard';
+  const allowed = getUserAllowedModules(user);
+  if (allowed.includes('dashboard')) {
+    return 'dashboard';
+  }
+  if (allowed.length > 0) {
+    return allowed[0];
+  }
+  return 'dashboard';
+}
+
 
 

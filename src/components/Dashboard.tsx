@@ -23,7 +23,7 @@ import {
   DollarSign,
   ArrowRight,
 } from 'lucide-react';
-import { Product, Batch, Movement } from '../types';
+import { Product, Batch, Movement, User, isUserAuthorizedForModule } from '../types';
 import { formatStockDisplay } from '../lib/unitConverter';
 import { NavTab } from './Navigation';
 
@@ -35,6 +35,7 @@ interface DashboardProps {
   onOpenExitModal: (prod?: Product) => void;
   onOpenXmlModal: () => void;
   onNavigateTab: (tab: NavTab) => void;
+  currentUser?: User | null;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -45,6 +46,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenExitModal,
   onOpenXmlModal,
   onNavigateTab,
+  currentUser,
 }) => {
   // Calculators
   const totalProducts = products.length;
@@ -102,15 +104,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onNavigateTab('carga_vendedor')}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-95"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Carga do Vendedor</span>
-            </button>
-          </div>
+          {isUserAuthorizedForModule(currentUser, 'carga_vendedor') && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onNavigateTab('carga_vendedor')}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-95"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Carga do Vendedor</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -122,109 +126,119 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
           {/* 1. Pré-Venda */}
-          <button
-            onClick={() => onNavigateTab('exits')}
-            className="group p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
-          >
-            <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold shadow-md shadow-rose-600/20 group-hover:scale-105 transition-transform">
-              <ArrowUpRight className="w-5 h-5" />
-            </div>
-            <div className="mt-3">
-              <span className="text-[10px] font-bold text-rose-800 dark:text-rose-300 block uppercase tracking-wider">
-                Operação
-              </span>
-              <span className="text-base font-black text-rose-950 dark:text-rose-100 block leading-tight">
-                Pré-Venda
-              </span>
-              <span className="text-[10px] text-rose-700 dark:text-rose-400 mt-0.5 block font-semibold">
-                Emitir orçamentos e saídas
-              </span>
-            </div>
-          </button>
+          {isUserAuthorizedForModule(currentUser, 'exits') && (
+            <button
+              onClick={() => onNavigateTab('exits')}
+              className="group p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
+            >
+              <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold shadow-md shadow-rose-600/20 group-hover:scale-105 transition-transform">
+                <ArrowUpRight className="w-5 h-5" />
+              </div>
+              <div className="mt-3">
+                <span className="text-[10px] font-bold text-rose-800 dark:text-rose-300 block uppercase tracking-wider">
+                  Operação
+                </span>
+                <span className="text-base font-black text-rose-950 dark:text-rose-100 block leading-tight">
+                  Pré-Venda
+                </span>
+                <span className="text-[10px] text-rose-700 dark:text-rose-400 mt-0.5 block font-semibold">
+                  Emitir orçamentos e saídas
+                </span>
+              </div>
+            </button>
+          )}
 
           {/* 2. PDV */}
-          <button
-            onClick={() => onNavigateTab('venda_rapida')}
-            className="group p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
-          >
-            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-600/20 group-hover:scale-105 transition-transform">
-              <ShoppingCart className="w-5 h-5" />
-            </div>
-            <div className="mt-3">
-              <span className="text-[10px] font-bold text-blue-800 dark:text-blue-300 block uppercase tracking-wider">
-                Caixa Rápido
-              </span>
-              <span className="text-base font-black text-blue-950 dark:text-blue-100 block leading-tight">
-                PDV
-              </span>
-              <span className="text-[10px] text-blue-700 dark:text-blue-400 mt-0.5 block font-semibold">
-                Vendas de balcão diretas
-              </span>
-            </div>
-          </button>
+          {isUserAuthorizedForModule(currentUser, 'venda_rapida') && (
+            <button
+              onClick={() => onNavigateTab('venda_rapida')}
+              className="group p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
+            >
+              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-600/20 group-hover:scale-105 transition-transform">
+                <ShoppingCart className="w-5 h-5" />
+              </div>
+              <div className="mt-3">
+                <span className="text-[10px] font-bold text-blue-800 dark:text-blue-300 block uppercase tracking-wider">
+                  Caixa Rápido
+                </span>
+                <span className="text-base font-black text-blue-950 dark:text-blue-100 block leading-tight">
+                  PDV
+                </span>
+                <span className="text-[10px] text-blue-700 dark:text-blue-400 mt-0.5 block font-semibold">
+                  Vendas de balcão diretas
+                </span>
+              </div>
+            </button>
+          )}
 
           {/* 3. Contas a Receber */}
-          <button
-            onClick={() => onNavigateTab('fiados')}
-            className="group p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
-          >
-            <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold shadow-md shadow-amber-600/20 group-hover:scale-105 transition-transform">
-              <BookOpenCheck className="w-5 h-5" />
-            </div>
-            <div className="mt-3">
-              <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 block uppercase tracking-wider">
-                Financeiro
-              </span>
-              <span className="text-base font-black text-amber-950 dark:text-amber-100 block leading-tight">
-                Contas a Receber
-              </span>
-              <span className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5 block font-semibold">
-                Controle de fiados e parcelas
-              </span>
-            </div>
-          </button>
+          {isUserAuthorizedForModule(currentUser, 'fiados') && (
+            <button
+              onClick={() => onNavigateTab('fiados')}
+              className="group p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
+            >
+              <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold shadow-md shadow-amber-600/20 group-hover:scale-105 transition-transform">
+                <BookOpenCheck className="w-5 h-5" />
+              </div>
+              <div className="mt-3">
+                <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 block uppercase tracking-wider">
+                  Financeiro
+                </span>
+                <span className="text-base font-black text-amber-950 dark:text-amber-100 block leading-tight">
+                  Contas a Receber
+                </span>
+                <span className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5 block font-semibold">
+                  Controle de fiados e parcelas
+                </span>
+              </div>
+            </button>
+          )}
 
           {/* 4. Carga do Vendedor */}
-          <button
-            onClick={() => onNavigateTab('carga_vendedor')}
-            className="group p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
-          >
-            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-            <div className="mt-3">
-              <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 block uppercase tracking-wider">
-                Conferência
-              </span>
-              <span className="text-base font-black text-emerald-950 dark:text-emerald-100 block leading-tight">
-                Carga Vendedor
-              </span>
-              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 block font-semibold">
-                Fechamento físico e caixa
-              </span>
-            </div>
-          </button>
+          {isUserAuthorizedForModule(currentUser, 'carga_vendedor') && (
+            <button
+              onClick={() => onNavigateTab('carga_vendedor')}
+              className="group p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
+            >
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div className="mt-3">
+                <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 block uppercase tracking-wider">
+                  Conferência
+                </span>
+                <span className="text-base font-black text-emerald-950 dark:text-emerald-100 block leading-tight">
+                  Carga Vendedor
+                </span>
+                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 block font-semibold">
+                  Fechamento físico e caixa
+                </span>
+              </div>
+            </button>
+          )}
 
           {/* 5. Relatórios */}
-          <button
-            onClick={() => onNavigateTab('reports')}
-            className="group p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
-          >
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-600/20 group-hover:scale-105 transition-transform">
-              <FileSpreadsheet className="w-5 h-5" />
-            </div>
-            <div className="mt-3">
-              <span className="text-[10px] font-bold text-indigo-800 dark:text-indigo-300 block uppercase tracking-wider">
-                Gerencial
-              </span>
-              <span className="text-base font-black text-indigo-950 dark:text-indigo-100 block leading-tight">
-                Relatórios
-              </span>
-              <span className="text-[10px] text-indigo-700 dark:text-indigo-400 mt-0.5 block font-semibold">
-                Análises e exportações
-              </span>
-            </div>
-          </button>
+          {isUserAuthorizedForModule(currentUser, 'reports') && (
+            <button
+              onClick={() => onNavigateTab('reports')}
+              className="group p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-left transition shadow-sm hover:shadow-md flex flex-col justify-between"
+            >
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-600/20 group-hover:scale-105 transition-transform">
+                <FileSpreadsheet className="w-5 h-5" />
+              </div>
+              <div className="mt-3">
+                <span className="text-[10px] font-bold text-indigo-800 dark:text-indigo-300 block uppercase tracking-wider">
+                  Gerencial
+                </span>
+                <span className="text-base font-black text-indigo-950 dark:text-indigo-100 block leading-tight">
+                  Relatórios
+                </span>
+                <span className="text-[10px] text-indigo-700 dark:text-indigo-400 mt-0.5 block font-semibold">
+                  Análises e exportações
+                </span>
+              </div>
+            </button>
+          )}
         </div>
       </div>
 

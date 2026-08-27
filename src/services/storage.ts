@@ -21,6 +21,7 @@ import {
   AuditLog,
   User,
   UserRole,
+  NavTab,
   UnitConversion,
   ConversionPreset,
   Customer,
@@ -618,6 +619,7 @@ class StorageService {
         company_id: user.company_id || 'comp-aquino',
         is_approved: user.is_approved !== false,
         is_blocked: user.is_blocked === true,
+        allowed_modules: user.allowed_modules ? JSON.stringify(user.allowed_modules) : null,
         created_at: user.created_at || new Date().toISOString(),
       });
     } catch (err) {
@@ -661,6 +663,19 @@ class StorageService {
       }
 
       for (const row of data) {
+        let allowedModules: NavTab[] | undefined = undefined;
+        if (row.allowed_modules) {
+          try {
+            allowedModules = typeof row.allowed_modules === 'string'
+              ? JSON.parse(row.allowed_modules)
+              : Array.isArray(row.allowed_modules)
+              ? row.allowed_modules
+              : undefined;
+          } catch {
+            allowedModules = undefined;
+          }
+        }
+
         const remoteUser: User = {
           id: row.id || 'usr-' + Date.now(),
           name: row.name || 'Usuário',
@@ -671,6 +686,7 @@ class StorageService {
           company_id: row.company_id || 'comp-aquino',
           is_approved: row.is_approved !== false,
           is_blocked: row.is_blocked === true,
+          allowed_modules: allowedModules,
           created_at: row.created_at || new Date().toISOString(),
         };
 
@@ -684,6 +700,7 @@ class StorageService {
           const merged: User = {
             ...target,
             ...remoteUser,
+            allowed_modules: remoteUser.allowed_modules !== undefined ? remoteUser.allowed_modules : target.allowed_modules,
             role: remoteUser.email.toLowerCase() === SUPERADMIN_EMAIL ? 'superadmin' : remoteUser.role,
             is_approved: remoteUser.email.toLowerCase() === SUPERADMIN_EMAIL ? true : remoteUser.is_approved,
             is_blocked: remoteUser.email.toLowerCase() === SUPERADMIN_EMAIL ? false : remoteUser.is_blocked,
@@ -873,6 +890,7 @@ class StorageService {
     role?: UserRole;
     company_id?: string;
     is_approved?: boolean;
+    allowed_modules?: NavTab[];
   }): { success: boolean; user?: User; error?: string } {
     const cleanEmail = data.email.trim().toLowerCase();
     const cleanUsername = (data.username || '').trim().toLowerCase();
@@ -919,6 +937,7 @@ class StorageService {
       is_approved: data.is_approved !== undefined ? data.is_approved : isSuper ? true : true, // Auto-approve created users
       password: data.password || '123',
       is_blocked: false,
+      allowed_modules: data.allowed_modules,
       created_at: new Date().toISOString(),
     };
 
@@ -957,6 +976,7 @@ class StorageService {
       email: data.email !== undefined ? data.email.trim().toLowerCase() : existing.email,
       username: data.username !== undefined ? data.username.trim().toLowerCase() : existing.username,
       password: data.password !== undefined && data.password !== '' ? data.password : existing.password,
+      allowed_modules: data.allowed_modules !== undefined ? data.allowed_modules : existing.allowed_modules,
     };
 
     users[idx] = updated;
@@ -970,6 +990,33 @@ class StorageService {
 
     this.addAuditLog('alteracao_lote', `Dados do usuário ${updated.name} atualizados com sucesso.`);
     return { success: true, user: updated };
+  }
+
+  public updateUserAllowedModules(userId: string, allowedModules: NavTab[]): { success: boolean; error?: string } {
+    const users = this.getUsers();
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx === -1) return { success: false, error: 'Usuário não encontrado.' };
+
+    const user = users[idx];
+    const updated: User = {
+      ...user,
+      allowed_modules: allowedModules,
+    };
+
+    users[idx] = updated;
+    this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(updated);
+
+    const curr = this.getCurrentUser();
+    if (curr && curr.id === userId) {
+      this.setItem(STORAGE_KEYS.CURRENT_USER, updated);
+    }
+
+    this.addAuditLog(
+      'alteracao_lote',
+      `Módulos permitidos atualizados para ${user.name}: ${allowedModules.length} módulos habilitados.`
+    );
+    return { success: true };
   }
 
   public toggleUserApproval(userId: string): { success: boolean; is_approved?: boolean; error?: string } {

@@ -32,12 +32,23 @@ import { GuidedTourModal } from './components/GuidedTourModal';
 import { HelpCenter } from './components/HelpCenter';
 import { SidebarDrawer } from './components/SidebarDrawer';
 
-import { Product, Batch, Movement, Category, Supplier, User, Company } from './types';
+import { Product, Batch, Movement, Category, Supplier, User, Company, isUserAuthorizedForModule, getDefaultTabForUser } from './types';
 import { storage, SUPERADMIN_EMAIL } from './services/storage';
 import { Building2 } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (localStorage.getItem('aquinos_remember_me') !== 'true') {
+      localStorage.removeItem('aquinos_current_user');
+    }
+    return storage.getCurrentUser();
+  });
+
+  const [activeTab, setActiveTab] = useState<NavTab>(() => {
+    const initialUser = storage.getCurrentUser();
+    return getDefaultTabForUser(initialUser);
+  });
+
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('aquinos_dark_mode') === 'true';
   });
@@ -50,12 +61,6 @@ export default function App() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeCompany, setActiveCompany] = useState<Company>(storage.getCurrentUserCompany());
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    if (localStorage.getItem('aquinos_remember_me') !== 'true') {
-      localStorage.removeItem('aquinos_current_user');
-    }
-    return storage.getCurrentUser();
-  });
 
   // Modals state
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
@@ -81,7 +86,8 @@ export default function App() {
     setMovements(storage.getMovements());
     setCompanies(storage.getCompanies());
     setActiveCompany(storage.getCurrentUserCompany());
-    setCurrentUser(storage.getCurrentUser());
+    const refreshedUser = storage.getCurrentUser();
+    setCurrentUser(refreshedUser);
   };
 
   useEffect(() => {
@@ -91,6 +97,14 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Enforce access control on activeTab when currentUser changes or activeTab changes
+  useEffect(() => {
+    if (currentUser && !isUserAuthorizedForModule(currentUser, activeTab)) {
+      const allowedDefault = getDefaultTabForUser(currentUser);
+      setActiveTab(allowedDefault);
+    }
+  }, [currentUser, activeTab]);
 
   // Sync Dark Mode class on <html> element
   useEffect(() => {
@@ -104,18 +118,23 @@ export default function App() {
   }, [darkMode]);
 
   const handleSelectTab = (tab: NavTab) => {
+    if (!isUserAuthorizedForModule(currentUser, tab)) {
+      alert('Você não tem permissão para acessar este módulo.');
+      return;
+    }
     setActiveTab(tab);
   };
 
   const handleBrandClick = () => {
-    if (activeTab === 'dashboard') return;
+    const defaultTab = getDefaultTabForUser(currentUser);
+    if (activeTab === defaultTab) return;
     if (['venda_rapida', 'entries', 'exits'].includes(activeTab)) {
       const confirmProceed = window.confirm(
         'Atenção: Há uma operação em andamento (no Caixa ou Movimentação de Estoque).\n\nDeseja cancelar/sair e voltar para a Tela Inicial?'
       );
       if (!confirmProceed) return;
     }
-    setActiveTab('dashboard');
+    setActiveTab(defaultTab);
   };
 
   const handleOpenEntry = (prod?: Product) => {
@@ -153,6 +172,7 @@ export default function App() {
         onLoginSuccess={(user) => {
           setCurrentUser(user);
           loadState();
+          setActiveTab(getDefaultTabForUser(user));
         }}
       />
     );
@@ -222,6 +242,7 @@ export default function App() {
         lowStockCount={lowStockCount}
         expiringCount={expiringCount}
         onOpenSidebar={() => setIsSidebarOpen(true)}
+        currentUser={currentUser}
       />
 
       {/* PWA Installation Banner */}
