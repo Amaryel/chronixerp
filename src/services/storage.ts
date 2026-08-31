@@ -192,10 +192,421 @@ const DEFAULT_SUPPLIERS: Supplier[] = [
   { id: 'sup-coca', name: 'Coca-Cola FEMSA', cnpj: '55.443.322/0001-88', phone: '(11) 0800-02121', email: 'pedidos@femsa.com.br' },
 ];
 
-// Initial Pre-seeded Products - Cleared per user request
-const DEFAULT_PRODUCTS: Product[] = [];
-const DEFAULT_BATCHES: Batch[] = [];
-const DEFAULT_MOVEMENTS: Movement[] = [];
+// Initial Pre-seeded Products (Imported from User List)
+const DEFAULT_PRODUCTS: Product[] = [
+  {
+    id: 'prod-frango-maringa',
+    name: 'Frango Inteiro Congelado Maringá',
+    brand: 'Maringá',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 2000,
+    min_stock: 200,
+    unit_price: 12.50,
+    cost_price: 9.80,
+    sale_price: 12.50,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-peito-maringa',
+    name: 'Peito de Frango Maringá',
+    brand: 'Maringá',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 36,
+    min_stock: 20,
+    unit_price: 18.90,
+    cost_price: 14.50,
+    sale_price: 18.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-coxa-sobrecoxa-maringa',
+    name: 'Coxa e Sobrecoxa Maringá',
+    brand: 'Maringá',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 180,
+    min_stock: 40,
+    unit_price: 14.90,
+    cost_price: 11.20,
+    sale_price: 14.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-peito-bonasa',
+    name: 'Peito de Frango Bonasa',
+    brand: 'Bonasa',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 360,
+    min_stock: 50,
+    unit_price: 18.50,
+    cost_price: 14.20,
+    sale_price: 18.50,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-file-peito-maringa',
+    name: 'Filé de Peito Maringá',
+    brand: 'Maringá',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 144,
+    min_stock: 30,
+    unit_price: 21.90,
+    cost_price: 16.80,
+    sale_price: 21.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-galinha-kidelicia',
+    name: 'Galinha Congelada Kidelicia',
+    brand: 'Kidelicia',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 180,
+    min_stock: 30,
+    unit_price: 13.90,
+    cost_price: 10.50,
+    sale_price: 13.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-carne-moida-forte',
+    name: 'Carne Moída Forte Bovino',
+    brand: 'Forte',
+    category_id: 'cat-congelados',
+    main_unit: 'KG',
+    current_stock: 100,
+    min_stock: 20,
+    unit_price: 26.90,
+    cost_price: 20.50,
+    sale_price: 26.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-ovos-moreira-bd',
+    name: 'Ovos Moreira (Bandeja)',
+    brand: 'Moreira',
+    category_id: 'cat-outros',
+    main_unit: 'UN',
+    current_stock: 180,
+    min_stock: 30,
+    unit_price: 18.00,
+    cost_price: 14.00,
+    sale_price: 18.00,
+    notes: 'Bandeja com 30 ovos',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-coxinha-temp-copacol',
+    name: 'Coxinha da Asa Temperada Copacol',
+    brand: 'Copacol',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 96,
+    min_stock: 20,
+    unit_price: 19.90,
+    cost_price: 15.20,
+    sale_price: 19.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-petisco-copacol',
+    name: 'Petisco de Frango Copacol',
+    brand: 'Copacol',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 320,
+    min_stock: 50,
+    unit_price: 22.50,
+    cost_price: 17.00,
+    sale_price: 22.50,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-mortadela-perdigao',
+    name: 'Mortadela Perdigão Tradicional',
+    brand: 'Perdigão',
+    category_id: 'cat-presuntos',
+    main_unit: 'KG',
+    current_stock: 28,
+    min_stock: 10,
+    unit_price: 16.90,
+    cost_price: 12.80,
+    sale_price: 16.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-mortadela-sadia',
+    name: 'Mortadela Sadia',
+    brand: 'Sadia',
+    category_id: 'cat-presuntos',
+    main_unit: 'KG',
+    current_stock: 260,
+    min_stock: 30,
+    unit_price: 17.50,
+    cost_price: 13.20,
+    sale_price: 17.50,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-calabresa-fina',
+    name: 'Linguiça Calabresa Fina',
+    brand: 'Diversos',
+    category_id: 'cat-linguicas',
+    main_unit: 'KG',
+    current_stock: 15,
+    min_stock: 10,
+    unit_price: 28.90,
+    cost_price: 22.00,
+    sale_price: 28.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-calabresa-sadia',
+    name: 'Linguiça Calabresa Sadia',
+    brand: 'Sadia',
+    category_id: 'cat-linguicas',
+    main_unit: 'KG',
+    current_stock: 30,
+    min_stock: 15,
+    unit_price: 29.90,
+    cost_price: 23.50,
+    sale_price: 29.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-asa-bonasa-bd',
+    name: 'Asa de Frango Bonasa (Bandeja)',
+    brand: 'Bonasa',
+    category_id: 'cat-frango',
+    main_unit: 'UN',
+    current_stock: 48,
+    min_stock: 10,
+    unit_price: 21.00,
+    cost_price: 16.50,
+    sale_price: 21.00,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-toscana-nobre-aurora',
+    name: 'Linguiça Toscana Nobre Aurora',
+    brand: 'Aurora',
+    category_id: 'cat-linguicas',
+    main_unit: 'KG',
+    current_stock: 250,
+    min_stock: 40,
+    unit_price: 24.90,
+    cost_price: 19.20,
+    sale_price: 24.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-toscana-aurora-suina',
+    name: 'Linguiça Toscana Aurora Suína',
+    brand: 'Aurora',
+    category_id: 'cat-linguicas',
+    main_unit: 'KG',
+    current_stock: 150,
+    min_stock: 30,
+    unit_price: 23.90,
+    cost_price: 18.50,
+    sale_price: 23.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-toscana-frango-avivar',
+    name: 'Linguiça Toscana de Frango Avivar',
+    brand: 'Avivar',
+    category_id: 'cat-linguicas',
+    main_unit: 'KG',
+    current_stock: 20,
+    min_stock: 10,
+    unit_price: 22.90,
+    cost_price: 17.50,
+    sale_price: 22.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-tulipa-frango',
+    name: 'Tulipa de Frango (Meio da Asa)',
+    brand: 'Diversos',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 12,
+    min_stock: 10,
+    unit_price: 27.90,
+    cost_price: 21.00,
+    sale_price: 27.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-cupim-kg',
+    name: 'Cupim Bovino Congelado',
+    brand: 'Diversos',
+    category_id: 'cat-congelados',
+    main_unit: 'KG',
+    current_stock: 5,
+    min_stock: 5,
+    unit_price: 39.90,
+    cost_price: 31.00,
+    sale_price: 39.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-galinha-grande-saborosa',
+    name: 'Galinha Grande Saborosa',
+    brand: 'Saborosa',
+    category_id: 'cat-frango',
+    main_unit: 'KG',
+    current_stock: 18,
+    min_stock: 10,
+    unit_price: 14.50,
+    cost_price: 11.00,
+    sale_price: 14.50,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-coxao-mole-resfriado',
+    name: 'Coxão Mole Resfriado Bovino',
+    brand: 'Diversos',
+    category_id: 'cat-congelados',
+    main_unit: 'KG',
+    current_stock: 21,
+    min_stock: 10,
+    unit_price: 42.90,
+    cost_price: 34.00,
+    sale_price: 42.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-costela-boi-resfriada',
+    name: 'Costela de Boi Resfriada',
+    brand: 'Diversos',
+    category_id: 'cat-congelados',
+    main_unit: 'KG',
+    current_stock: 12,
+    min_stock: 10,
+    unit_price: 29.90,
+    cost_price: 23.00,
+    sale_price: 29.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-queijo-mussarela-carrinho',
+    name: 'Queijo Mussarela Carrinho',
+    brand: 'Carrinho',
+    category_id: 'cat-queijos',
+    main_unit: 'KG',
+    current_stock: 12,
+    min_stock: 10,
+    unit_price: 36.90,
+    cost_price: 28.50,
+    sale_price: 36.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-queijo-fatiado-bd',
+    name: 'Queijo Mussarela Fatiado (Bandeja)',
+    brand: 'Diversos',
+    category_id: 'cat-queijos',
+    main_unit: 'UN',
+    current_stock: 120,
+    min_stock: 20,
+    unit_price: 12.50,
+    cost_price: 9.50,
+    sale_price: 12.50,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-capa-file-chef',
+    name: 'Capa de Filé Chef Bovino',
+    brand: 'Chef',
+    category_id: 'cat-congelados',
+    main_unit: 'KG',
+    current_stock: 22,
+    min_stock: 10,
+    unit_price: 33.90,
+    cost_price: 26.50,
+    sale_price: 33.90,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-capa-file-quality',
+    name: 'Capa de Filé Quality Bovino',
+    brand: 'Quality',
+    category_id: 'cat-congelados',
+    main_unit: 'KG',
+    current_stock: 39,
+    min_stock: 10,
+    unit_price: 34.50,
+    cost_price: 27.00,
+    sale_price: 34.50,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+const DEFAULT_BATCHES: Batch[] = DEFAULT_PRODUCTS.map((prod) => ({
+  id: `batch-${prod.id}`,
+  product_id: prod.id,
+  product_name: prod.name,
+  batch_number: 'LOTE-INICIAL',
+  expiration_date: new Date(Date.now() + 90 * 24 * 3600000).toISOString().split('T')[0],
+  initial_qty: prod.current_stock,
+  current_qty: prod.current_stock,
+  created_at: new Date().toISOString(),
+}));
+
+const DEFAULT_MOVEMENTS: Movement[] = DEFAULT_PRODUCTS.map((prod) => ({
+  id: `mov-init-${prod.id}`,
+  date: new Date().toISOString(),
+  user_id: 'usr-superadmin',
+  user_name: 'Amaryel (Superadmin)',
+  user_role: 'superadmin',
+  product_id: prod.id,
+  product_name: prod.name,
+  type: 'entrada',
+  used_qty: prod.current_stock,
+  used_unit: prod.main_unit,
+  converted_qty: prod.current_stock,
+  main_unit: prod.main_unit,
+  prev_stock: 0,
+  current_stock: prod.current_stock,
+  unit_price: prod.unit_price || 0,
+  total_price: (prod.unit_price || 0) * prod.current_stock,
+  origin: 'manual',
+  notes: 'Estoque inicial cadastrado na importação',
+  created_at: new Date().toISOString(),
+}));
 
 // Initial Audit Logs
 const now = new Date();
@@ -435,14 +846,58 @@ class StorageService {
     if (!localStorage.getItem(STORAGE_KEYS.SUPPLIERS)) {
       localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(DEFAULT_SUPPLIERS));
     }
+    // Initialize / Migrate user products list
+    const importedFlag = localStorage.getItem('aquinos_imported_user_list_v1');
+    if (!importedFlag) {
+      let existingProducts: Product[] = [];
+      try {
+        existingProducts = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRODUCTS) || '[]');
+      } catch {
+        existingProducts = [];
+      }
+
+      // Merge user products with existing without duplicate IDs
+      const productMap = new Map<string, Product>();
+      DEFAULT_PRODUCTS.forEach((p) => productMap.set(p.id, p));
+      existingProducts.forEach((p) => productMap.set(p.id, p));
+      const finalProducts = Array.from(productMap.values());
+
+      let existingBatches: Batch[] = [];
+      try {
+        existingBatches = JSON.parse(localStorage.getItem(STORAGE_KEYS.BATCHES) || '[]');
+      } catch {
+        existingBatches = [];
+      }
+      const batchMap = new Map<string, Batch>();
+      DEFAULT_BATCHES.forEach((b) => batchMap.set(b.id, b));
+      existingBatches.forEach((b) => batchMap.set(b.id, b));
+      const finalBatches = Array.from(batchMap.values());
+
+      let existingMovements: Movement[] = [];
+      try {
+        existingMovements = JSON.parse(localStorage.getItem(STORAGE_KEYS.MOVEMENTS) || '[]');
+      } catch {
+        existingMovements = [];
+      }
+      const movementMap = new Map<string, Movement>();
+      DEFAULT_MOVEMENTS.forEach((m) => movementMap.set(m.id, m));
+      existingMovements.forEach((m) => movementMap.set(m.id, m));
+      const finalMovements = Array.from(movementMap.values());
+
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(finalProducts));
+      localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(finalBatches));
+      localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(finalMovements));
+      localStorage.setItem('aquinos_imported_user_list_v1', 'true');
+    }
+
     if (!localStorage.getItem(STORAGE_KEYS.PRODUCTS)) {
-      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(DEFAULT_PRODUCTS));
     }
     if (!localStorage.getItem(STORAGE_KEYS.BATCHES)) {
-      localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(DEFAULT_BATCHES));
     }
     if (!localStorage.getItem(STORAGE_KEYS.MOVEMENTS)) {
-      localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(DEFAULT_MOVEMENTS));
     }
     if (!localStorage.getItem(STORAGE_KEYS.XML_IMPORTS)) {
       localStorage.setItem(STORAGE_KEYS.XML_IMPORTS, JSON.stringify([]));
