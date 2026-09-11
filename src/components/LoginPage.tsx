@@ -540,10 +540,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           )}
         </div>
 
-        {/* Footer Security Note */}
-        <div className="p-4 text-center bg-slate-950 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Ambiente Seguro • Chronix ERP v2.5.0</span>
+        {/* Footer Version Note */}
+        <div className="p-4 text-center bg-slate-950 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-center">
+          <span>v2.5.0</span>
         </div>
       </div>
     </div>
