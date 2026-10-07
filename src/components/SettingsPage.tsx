@@ -3,7 +3,7 @@
  * Layout Reorganizado com UX/UI moderna, Categorias Estruturadas e 100% Mobile-First.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Sliders,
   Users,
@@ -45,6 +45,7 @@ interface SettingsPageProps {
   categories: Category[];
   currentUser: UserType;
   onRefresh: () => void;
+  initialSubTab?: SettingItemKey;
 }
 
 type SettingCategoryKey = 'geral' | 'equipe' | 'estoque' | 'relatorios' | 'sistema';
@@ -98,7 +99,7 @@ const SETTING_ITEMS: SettingItemDef[] = [
     icon: Building2,
     badge: 'Super Admin',
     isSuperadminOnly: true,
-    type: 'modal',
+    type: 'inline',
   },
 
   // 2. Equipe & Acessos
@@ -109,7 +110,7 @@ const SETTING_ITEMS: SettingItemDef[] = [
     subtitle: 'Controle de logins, cargos, bloqueios e liberação de módulos',
     icon: Users,
     badge: 'Controle',
-    type: 'modal',
+    type: 'inline',
   },
 
   // 3. Estoque & Operações
@@ -208,10 +209,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   categories,
   currentUser,
   onRefresh,
+  initialSubTab,
 }) => {
-  const [activeInlineSubTab, setActiveInlineSubTab] = useState<
-    'preferences' | 'batches' | 'inventory' | 'reports' | 'audit'
-  >('preferences');
+  const [activeInlineSubTab, setActiveInlineSubTab] = useState<SettingItemKey>(
+    initialSubTab || 'preferences'
+  );
 
   const [activeCategory, setActiveCategory] = useState<SettingCategoryKey>('geral');
   const [searchQuery, setSearchQuery] = useState('');
@@ -221,8 +223,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [isXmlModalOpen, setIsXmlModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
-  const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(false);
-  const [userManagementDefaultTab, setUserManagementDefaultTab] = useState<'users' | 'companies' | 'permissions'>('users');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveInlineSubTab(initialSubTab);
+      const item = SETTING_ITEMS.find((i) => i.id === initialSubTab);
+      if (item) {
+        setActiveCategory(item.category);
+      }
+      setIsMobileDetailView(true);
+    }
+  }, [initialSubTab]);
 
   const isSuperadmin =
     currentUser.email.toLowerCase() === SUPERADMIN_EMAIL || currentUser.role === 'superadmin';
@@ -248,14 +259,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       setIsProfileModalOpen(true);
     } else if (item.id === 'supabase') {
       setIsSupabaseModalOpen(true);
-    } else if (item.id === 'users') {
-      setUserManagementDefaultTab('users');
-      setIsUserManagementModalOpen(true);
-    } else if (item.id === 'companies') {
-      setUserManagementDefaultTab('companies');
-      setIsUserManagementModalOpen(true);
     } else {
-      setActiveInlineSubTab(item.id as any);
+      setActiveInlineSubTab(item.id);
       setActiveCategory(item.category);
       setIsMobileDetailView(true);
     }
@@ -292,8 +297,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               onClick={() => {
-                setUserManagementDefaultTab('companies');
-                setIsUserManagementModalOpen(true);
+                setActiveInlineSubTab('companies');
+                setActiveCategory('geral');
+                setIsMobileDetailView(true);
               }}
               className="px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-2 shadow-sm active:scale-95"
             >
@@ -313,41 +319,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       </div>
 
       {/* SEARCH & FILTER BAR */}
-      <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:max-w-md">
+      <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-3">
+        <div className="relative w-full">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar configuração, lote, relatório, usuário..."
+            placeholder="Buscar configuração, lote, relatório, regras fiscais, permissões..."
             className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-blue-500 transition"
           />
-        </div>
-
-        {/* Quick Category Chips for Desktop */}
-        <div className="hidden lg:flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full">
-          {CATEGORIES.map((cat) => {
-            const Icon = cat.icon;
-            const isCatActive = activeCategory === cat.key;
-            return (
-              <button
-                key={cat.key}
-                onClick={() => {
-                  setActiveCategory(cat.key);
-                  setSearchQuery('');
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-                  isCatActive
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{cat.label}</span>
-              </button>
-            );
-          })}
         </div>
       </div>
 
@@ -507,6 +488,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <OperationalPreferences onRefresh={onRefresh} />
           )}
 
+          {activeInlineSubTab === 'companies' && (
+            <UserManagementModal
+              inline={true}
+              currentUser={currentUser}
+              initialTab="companies"
+              onRefresh={onRefresh}
+            />
+          )}
+
+          {activeInlineSubTab === 'users' && (
+            <UserManagementModal
+              inline={true}
+              currentUser={currentUser}
+              initialTab="users"
+              onRefresh={onRefresh}
+            />
+          )}
+
           {activeInlineSubTab === 'batches' && (
             <BatchManager
               products={products}
@@ -558,14 +557,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         isOpen={isSupabaseModalOpen}
         currentUser={currentUser}
         onClose={() => setIsSupabaseModalOpen(false)}
-      />
-
-      <UserManagementModal
-        isOpen={isUserManagementModalOpen}
-        currentUser={currentUser}
-        initialTab={userManagementDefaultTab}
-        onClose={() => setIsUserManagementModalOpen(false)}
-        onRefresh={onRefresh}
       />
     </div>
   );

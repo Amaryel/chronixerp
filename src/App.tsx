@@ -16,7 +16,6 @@ import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { HistoryList } from './components/HistoryList';
 import { UserProfileModal } from './components/UserProfileModal';
 import { SupabaseModal } from './components/SupabaseModal';
-import { UserManagementModal } from './components/UserManagementModal';
 import { LoginPage } from './components/LoginPage';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { FullMovementPage } from './components/FullMovementPage';
@@ -68,11 +67,21 @@ export default function App() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
-  const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(false);
+  const [settingsInitialSubTab, setSettingsInitialSubTab] = useState<any>('preferences');
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isContextHelpOpen, setIsContextHelpOpen] = useState(false);
   const [isGuidedTourOpen, setIsGuidedTourOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const handleOpenSuperAdmin = () => {
+    setSettingsInitialSubTab('companies');
+    setActiveTab('settings');
+  };
+
+  const handleOpenUserManagement = () => {
+    setSettingsInitialSubTab('users');
+    setActiveTab('settings');
+  };
 
   // Sync state from storage
   const loadState = () => {
@@ -217,7 +226,7 @@ export default function App() {
         }}
         onOpenSidebar={() => setIsSidebarOpen(true)}
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
-        onOpenUserManagement={() => setIsUserManagementModalOpen(true)}
+        onOpenUserManagement={handleOpenSuperAdmin}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
         onOpenScanner={() => setIsScannerOpen(true)}
         onOpenContextHelp={() => setIsContextHelpOpen(true)}
@@ -357,6 +366,7 @@ export default function App() {
             categories={categories}
             currentUser={currentUser}
             onRefresh={loadState}
+            initialSubTab={settingsInitialSubTab}
           />
         )}
 
@@ -441,13 +451,6 @@ export default function App() {
         onClose={() => setIsSupabaseModalOpen(false)}
       />
 
-      <UserManagementModal
-        isOpen={isUserManagementModalOpen}
-        onClose={() => setIsUserManagementModalOpen(false)}
-        currentUser={currentUser}
-        onRefresh={loadState}
-      />
-
       {/* Responsive Navigation Sidebar Drawer (Mobile & Tablet) */}
       {isSidebarOpen && (
         <SidebarDrawer
@@ -462,7 +465,7 @@ export default function App() {
           darkMode={darkMode}
           setDarkMode={setDarkMode}
           onOpenProfileModal={() => setIsProfileModalOpen(true)}
-          onOpenUserManagement={() => setIsUserManagementModalOpen(true)}
+          onOpenUserManagement={handleOpenSuperAdmin}
           onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
           onOpenContextHelp={() => setIsContextHelpOpen(true)}
           onOpenSupport={() => setIsSupportModalOpen(true)}

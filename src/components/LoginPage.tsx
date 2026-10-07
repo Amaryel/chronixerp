@@ -57,39 +57,38 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setSuccessMessage('');
     setPendingNotice(null);
 
-    if (!email.trim() || !password) {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
       setErrorMessage('Preencha o e-mail/usuário e a senha para continuar.');
       return;
-    }
-
-    // Set active session in memory/sessionStorage immediately to avoid double-submit race condition
-    sessionStorage.setItem('aquinos_session_active', 'true');
-    if (rememberMe) {
-      localStorage.setItem('aquinos_remember_me', 'true');
-      localStorage.setItem('aquinos_saved_email', email.trim());
-      localStorage.setItem('aquinos_saved_password', password);
-    } else {
-      localStorage.removeItem('aquinos_remember_me');
-      localStorage.removeItem('aquinos_saved_email');
-      localStorage.removeItem('aquinos_saved_password');
     }
 
     setIsLoggingIn(true);
 
     try {
       // Fast, online-first login that fetches fresh credentials from Supabase
-      const result = await storage.loginAsync(email, password);
+      const result = await storage.loginAsync(cleanEmail, password);
 
       if (!result.success || !result.user) {
-        sessionStorage.removeItem('aquinos_session_active');
         setErrorMessage(result.error || 'Erro ao realizar login.');
         return;
+      }
+
+      // Set active session & credentials only upon verified success
+      sessionStorage.setItem('aquinos_session_active', 'true');
+      if (rememberMe) {
+        localStorage.setItem('aquinos_remember_me', 'true');
+        localStorage.setItem('aquinos_saved_email', cleanEmail);
+        localStorage.setItem('aquinos_saved_password', password);
+      } else {
+        localStorage.removeItem('aquinos_remember_me');
+        localStorage.removeItem('aquinos_saved_email');
+        localStorage.removeItem('aquinos_saved_password');
       }
 
       // Immediate callback on login success
       onLoginSuccess(result.user);
     } catch (err: any) {
-      sessionStorage.removeItem('aquinos_session_active');
       setErrorMessage(err?.message || 'Erro ao realizar login.');
     } finally {
       setIsLoggingIn(false);

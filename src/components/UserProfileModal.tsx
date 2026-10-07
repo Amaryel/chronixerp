@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Shield, Check, X, User as UserIcon, Mail, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { UserCheck, Shield, Check, X, User as UserIcon, Mail, Save, Trash2, AlertTriangle, KeyRound, Lock } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { storage } from '../services/storage';
 
@@ -24,6 +24,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [name, setName] = useState(currentUser?.name || 'Francisco Aquino');
   const [email, setEmail] = useState(currentUser?.email || 'francisco@aquinosfrios.com.br');
   const [role, setRole] = useState<UserRole>(currentUser?.role || 'admin');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -32,23 +35,43 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setName(currentUser.name || 'Francisco Aquino');
       setEmail(currentUser.email || 'francisco@aquinosfrios.com.br');
       setRole(currentUser.role || 'admin');
+      setNewPassword('');
+      setConfirmPassword('');
+      setErrorMessage('');
     }
   }, [currentUser, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    storage.updateUserProfile({
+    setErrorMessage('');
+
+    if (newPassword) {
+      if (newPassword.length < 3) {
+        setErrorMessage('A nova senha deve ter no mínimo 3 caracteres.');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setErrorMessage('A confirmação de senha não confere.');
+        return;
+      }
+    }
+
+    await storage.updateUserProfileAsync({
       name: name.trim() || 'Francisco Aquino',
       email: email.trim() || 'francisco@aquinosfrios.com.br',
       role,
+      password: newPassword ? newPassword.trim() : undefined,
     });
+
     setSavedSuccess(true);
+    setNewPassword('');
+    setConfirmPassword('');
     onRefresh();
     setTimeout(() => {
       setSavedSuccess(false);
-    }, 2000);
+    }, 2500);
   };
 
   const handleClearProducts = () => {
@@ -165,10 +188,59 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
           </div>
 
+          {/* Password Change Section */}
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-3">
+            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+              <KeyRound className="w-3.5 h-3.5 text-blue-500" />
+              <span className="font-bold text-xs">Alterar Senha de Acesso (Opcional)</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                  Nova Senha
+                </label>
+                <div className="relative">
+                  <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 3 caracteres"
+                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                  Confirmar Nova Senha
+                </label>
+                <div className="relative">
+                  <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repita a nova senha"
+                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {errorMessage && (
+              <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between pt-2">
             {savedSuccess ? (
               <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-1">
-                <Check className="w-4 h-4" /> Informações salvas com sucesso!
+                <Check className="w-4 h-4" /> Informações e senha salvas no Supabase com sucesso!
               </span>
             ) : (
               <span />

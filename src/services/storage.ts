@@ -1229,19 +1229,46 @@ class StorageService {
     try {
       const client = getSupabaseClient();
       if (!client) return;
-      await client.from('usuarios').upsert({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        username: user.username || null,
-        password: user.password || '123',
-        role: user.role,
-        company_id: user.company_id || 'comp-aquino',
-        is_approved: user.is_approved !== false,
-        is_blocked: user.is_blocked === true,
-        allowed_modules: user.allowed_modules ? JSON.stringify(user.allowed_modules) : null,
-        created_at: user.created_at || new Date().toISOString(),
-      });
+      const cleanEmail = user.email.trim().toLowerCase();
+
+      // Check if user already exists by ID or email
+      const { data: existingRows } = await client
+        .from('usuarios')
+        .select('id, email')
+        .or(`id.eq.${user.id},email.ilike.${cleanEmail}`)
+        .limit(1);
+
+      if (existingRows && existingRows.length > 0) {
+        const targetId = existingRows[0].id;
+        await client
+          .from('usuarios')
+          .update({
+            name: user.name,
+            email: cleanEmail,
+            username: user.username || null,
+            password: user.password || '123',
+            role: user.role,
+            company_id: user.company_id || 'comp-aquino',
+            is_approved: user.is_approved !== false,
+            is_blocked: user.is_blocked === true,
+            allowed_modules: user.allowed_modules ? JSON.stringify(user.allowed_modules) : null,
+          })
+          .eq('id', targetId);
+      } else {
+        await client.from('usuarios').insert({
+          id: user.id,
+          name: user.name,
+          email: cleanEmail,
+          username: user.username || null,
+          password: user.password || '123',
+          role: user.role,
+          company_id: user.company_id || 'comp-aquino',
+          is_approved: user.is_approved !== false,
+          is_blocked: user.is_blocked === true,
+          allowed_modules: user.allowed_modules ? JSON.stringify(user.allowed_modules) : null,
+          created_at: user.created_at || new Date().toISOString(),
+        });
+      }
     } catch (err) {
       console.warn('Failed to save user to Supabase:', err);
     }
@@ -1791,14 +1818,77 @@ class StorageService {
   }
 
   public async loginAsync(identifier: string, password?: string): Promise<{ success: boolean; user?: User; error?: string }> {
+    const cleanId = identifier.trim().toLowerCase();
+    if (!cleanId) {
+      return { success: false, error: 'Por favor, informe seu e-mail ou nome de usuário.' };
+    }
+    if (!password || !password.trim()) {
+      return { success: false, error: 'Por favor, informe sua senha de acesso.' };
+    }
+
     // 1. Sync remote users directly from Supabase to ensure fresh passwords and approvals
     try {
-      await this.syncUsersFromSupabase();
+      const client = getSupabaseClient();
+      if (client) {
+        const { data, error } = await client
+          .from('usuarios')
+          .select('*')
+          .or(`email.ilike.${cleanId},username.ilike.${cleanId},name.ilike.${cleanId}`)
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          const row = data[0];
+          let allowedModules: NavTab[] | undefined = undefined;
+          if (row.allowed_modules) {
+            try {
+              allowedModules = typeof row.allowed_modules === 'string'
+                ? JSON.parse(row.allowed_modules)
+                : Array.isArray(row.allowed_modules)
+                ? row.allowed_modules
+                : undefined;
+            } catch {
+              allowedModules = undefined;
+            }
+          }
+
+          const remoteUser: User = {
+            id: row.id || 'usr-' + Date.now(),
+            name: row.name || 'Usuário',
+            email: row.email,
+            username: row.username || undefined,
+            password: row.password || '123',
+            role: row.email.toLowerCase() === SUPERADMIN_EMAIL ? 'superadmin' : (row.role || 'funcionario'),
+            company_id: row.company_id || 'comp-aquino',
+            is_approved: row.email.toLowerCase() === SUPERADMIN_EMAIL ? true : (row.is_approved !== false),
+            is_blocked: row.email.toLowerCase() === SUPERADMIN_EMAIL ? false : (row.is_blocked === true),
+            allowed_modules: allowedModules,
+            created_at: row.created_at || new Date().toISOString(),
+          };
+
+          const users = this.getUsers();
+          const idx = users.findIndex(
+            (u) =>
+              u.id === remoteUser.id ||
+              u.email.toLowerCase() === remoteUser.email.toLowerCase() ||
+              (remoteUser.username && u.username && u.username.toLowerCase() === remoteUser.username.toLowerCase())
+          );
+          if (idx !== -1) {
+            users[idx] = remoteUser;
+          } else {
+            users.push(remoteUser);
+          }
+          this.setItem(STORAGE_KEYS.USERS, users);
+        } else {
+          await this.syncUsersFromSupabase();
+        }
+      } else {
+        await this.syncUsersFromSupabase();
+      }
     } catch (err) {
       console.warn('Sync before login skipped (offline mode):', err);
     }
 
-    // 2. Perform authentication with the fresh database state
+    // 2. Perform strict authentication with the fresh database state
     const result = this.login(identifier, password);
     if (result.success && result.user) {
       // Trigger background sync for full catalog
@@ -1811,6 +1901,13 @@ class StorageService {
 
   public login(identifier: string, password?: string): { success: boolean; user?: User; error?: string } {
     const cleanId = identifier.trim().toLowerCase();
+    if (!cleanId) {
+      return { success: false, error: 'Por favor, informe seu e-mail ou nome de usuário.' };
+    }
+    if (!password || !password.trim()) {
+      return { success: false, error: 'Por favor, informe sua senha de acesso.' };
+    }
+
     const users = this.getUsers();
 
     // Match by email, username or name
@@ -1821,7 +1918,7 @@ class StorageService {
         (u.name && u.name.toLowerCase() === cleanId)
     );
 
-    // If superadmin email and not found yet, create automatically
+    // If superadmin email and not found yet, create automatically with initial default password '123'
     if (!found && cleanId === SUPERADMIN_EMAIL) {
       found = {
         id: 'usr-superadmin',
@@ -1831,7 +1928,7 @@ class StorageService {
         role: 'superadmin',
         company_id: 'comp-aquino',
         is_approved: true,
-        password: password || '123',
+        password: '123',
         is_blocked: false,
         created_at: new Date().toISOString(),
       };
@@ -1844,42 +1941,33 @@ class StorageService {
       return { success: false, error: 'Usuário não encontrado com este e-mail ou nome de usuário. Solicite o cadastro ou verifique seus dados.' };
     }
 
-    // Special logic for Superadmin (amaryelcc@gmail.com): always approve and auto-update password if entered
+    // Check if blocked
+    if (found.is_blocked) {
+      return {
+        success: false,
+        error: 'Sua conta foi bloqueada. Entre em contato com o suporte ou Administrador.',
+      };
+    }
+
+    // Check if approved
+    if (found.email.toLowerCase() !== SUPERADMIN_EMAIL && found.is_approved === false) {
+      return {
+        success: false,
+        error: 'Sua conta está pendente de liberação pelo Administrador.',
+      };
+    }
+
+    // STRICT PASSWORD VERIFICATION for ALL accounts
+    const expectedPassword = found.password || '123';
+    if (password !== expectedPassword) {
+      return { success: false, error: 'Senha incorreta. Verifique sua senha ou clique em "Esqueci minha senha" para redefinir.' };
+    }
+
+    // Keep superadmin role and approval in sync
     if (cleanId === SUPERADMIN_EMAIL || found.email.toLowerCase() === SUPERADMIN_EMAIL) {
       found.role = 'superadmin';
       found.is_approved = true;
       found.is_blocked = false;
-      if (password) {
-        found.password = password;
-        const idx = users.findIndex((u) => u.email.toLowerCase() === SUPERADMIN_EMAIL);
-        if (idx !== -1) {
-          users[idx] = { ...found };
-          this.setItem(STORAGE_KEYS.USERS, users);
-        }
-        this.saveUserToSupabase(found);
-      }
-    } else {
-      // Check if blocked
-      if (found.is_blocked) {
-        return {
-          success: false,
-          error: 'Sua conta foi bloqueada. Entre em contato com o suporte ou Administrador.',
-        };
-      }
-
-      // Check if approved
-      if (found.is_approved === false) {
-        return {
-          success: false,
-          error: 'Sua conta está pendente de liberação pelo Administrador.',
-        };
-      }
-
-      // Password verification for regular users
-      const expectedPassword = found.password || '123';
-      if (password && expectedPassword !== password) {
-        return { success: false, error: 'Senha incorreta. Verifique sua senha ou clique em "Esqueci minha senha" para redefinir.' };
-      }
     }
 
     // Check company status if user belongs to a company
@@ -1898,10 +1986,35 @@ class StorageService {
   }
 
   public async resetUserPasswordByEmailAsync(email: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
-    const res = this.resetUserPasswordByEmail(email, newPassword);
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      return { success: false, error: 'Informe o e-mail cadastrado.' };
+    }
+    if (!newPassword || newPassword.length < 3) {
+      return { success: false, error: 'A senha deve ter pelo menos 3 caracteres.' };
+    }
+
+    try {
+      const client = getSupabaseClient();
+      if (client) {
+        const { data, error } = await client
+          .from('usuarios')
+          .select('*')
+          .or(`email.ilike.${cleanEmail},username.ilike.${cleanEmail}`)
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          const userRow = data[0];
+          await client.from('usuarios').update({ password: newPassword }).eq('id', userRow.id);
+        }
+      }
+    } catch (err) {
+      console.warn('Error updating password in Supabase:', err);
+    }
+
+    const res = this.resetUserPasswordByEmail(cleanEmail, newPassword);
     if (res.success) {
       const users = this.getUsers();
-      const cleanEmail = email.trim().toLowerCase();
       const updated = users.find(
         (u) => u.email.toLowerCase() === cleanEmail || (u.username && u.username.toLowerCase() === cleanEmail)
       );
@@ -2170,15 +2283,48 @@ class StorageService {
     return { success: true };
   }
 
+  public async updateUserPasswordAsync(userId: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    if (!newPassword || newPassword.length < 3) {
+      return { success: false, error: 'A nova senha deve conter pelo menos 3 caracteres.' };
+    }
+    const res = this.updateUserPassword(userId, newPassword);
+    if (res.success) {
+      const users = this.getUsers();
+      const target = users.find((u) => u.id === userId);
+      if (target) {
+        await this.saveUserToSupabase(target);
+        try {
+          const client = getSupabaseClient();
+          if (client) {
+            await client
+              .from('usuarios')
+              .update({ password: newPassword })
+              .or(`id.eq.${userId},email.ilike.${target.email.toLowerCase()}`);
+          }
+        } catch (err) {
+          console.warn('Direct password update in Supabase error:', err);
+        }
+      }
+    }
+    return res;
+  }
+
   public updateUserPassword(userId: string, newPassword: string): { success: boolean; error?: string } {
     const users = this.getUsers();
     const userIndex = users.findIndex((u) => u.id === userId);
 
     if (userIndex === -1) return { success: false, error: 'Usuário não encontrado.' };
 
-    users[userIndex] = { ...users[userIndex], password: newPassword };
+    const updatedUser = { ...users[userIndex], password: newPassword };
+    users[userIndex] = updatedUser;
     this.setItem(STORAGE_KEYS.USERS, users);
-    this.saveUserToSupabase(users[userIndex]);
+
+    const curr = this.getCurrentUser();
+    if (curr && curr.id === userId) {
+      this.setItem(STORAGE_KEYS.CURRENT_USER, updatedUser);
+    }
+
+    this.saveUserToSupabase(updatedUser);
     return { success: true };
   }
 
@@ -2211,10 +2357,24 @@ class StorageService {
     this.setCurrentUser(target);
   }
 
-  public updateUserProfile(updated: { name?: string; email?: string; role?: UserRole }) {
+  public async updateUserProfileAsync(updated: { name?: string; email?: string; role?: UserRole; password?: string }): Promise<void> {
+    this.updateUserProfile(updated);
+    const current = this.getCurrentUser();
+    if (current) {
+      await this.saveUserToSupabase(current);
+    }
+  }
+
+  public updateUserProfile(updated: { name?: string; email?: string; role?: UserRole; password?: string }) {
     const current = this.getCurrentUser();
     if (!current) return;
-    const newUser = { ...current, ...updated };
+    const cleanEmail = updated.email ? updated.email.trim().toLowerCase() : current.email;
+    const newUser: User = {
+      ...current,
+      ...updated,
+      email: cleanEmail,
+      password: updated.password && updated.password.trim() ? updated.password.trim() : current.password,
+    };
     this.setItem(STORAGE_KEYS.CURRENT_USER, newUser);
 
     const users = this.getUsers().map((u) => (u.id === newUser.id ? newUser : u));
