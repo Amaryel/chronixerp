@@ -282,7 +282,7 @@ export const ProductList: React.FC<ProductListProps> = ({
   };
 
   const handleDeleteProduct = (prod: Product) => {
-    if (currentUser.role !== 'admin') {
+    if (currentUser.role !== 'admin' && currentUser.role !== 'superadmin') {
       alert('⚠️ Apenas Administradores têm permissão para excluir produtos.');
       return;
     }
@@ -621,7 +621,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                       <span>Editar</span>
                     </button>
 
-                    {currentUser.role === 'admin' && (
+                    {(currentUser.role === 'admin' || currentUser.role === 'superadmin') && (
                       <button
                         onClick={() => handleDeleteProduct(p)}
                         className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-100 dark:bg-slate-700 dark:hover:bg-rose-950 text-slate-500 hover:text-rose-600 font-bold text-xs flex items-center justify-center transition"
@@ -762,7 +762,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
 
-                          {currentUser.role === 'admin' && (
+                          {(currentUser.role === 'admin' || currentUser.role === 'superadmin') && (
                             <button
                               onClick={() => handleDeleteProduct(p)}
                               className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-100 dark:bg-slate-700 dark:hover:bg-rose-950 text-slate-400 hover:text-rose-600 transition"

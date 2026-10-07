@@ -303,9 +303,27 @@ CREATE TABLE IF NOT EXISTS produtos (
   category_id TEXT REFERENCES categorias(id) ON DELETE SET NULL,
   brand TEXT,
   notes TEXT,
+  unit_price NUMERIC,
+  cost_price NUMERIC,
+  sale_price NUMERIC,
+  markup NUMERIC,
+  box_conversion_unit TEXT,
+  box_conversion_value NUMERIC,
+  allow_fractional BOOLEAN,
+  price_per_kg NUMERIC,
+  price_per_box NUMERIC,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS unit_price NUMERIC;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS cost_price NUMERIC;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS sale_price NUMERIC;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS markup NUMERIC;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS box_conversion_unit TEXT;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS box_conversion_value NUMERIC;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS allow_fractional BOOLEAN;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS price_per_kg NUMERIC;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS price_per_box NUMERIC;
 ALTER TABLE produtos ENABLE ROW LEVEL SECURITY;
 
 -- 5. Conversões de Unidade

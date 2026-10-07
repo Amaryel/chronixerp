@@ -65,13 +65,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setIsLoggingIn(true);
 
     try {
-      let result = storage.login(email, password);
-      
-      // If user not found locally or login failed, attempt to sync from Supabase and retry
-      if (!result.success) {
-        await storage.syncUsersFromSupabase();
-        result = storage.login(email, password);
-      }
+      // Fast, online-first login that fetches fresh credentials from Supabase
+      const result = await storage.loginAsync(email, password);
 
       if (!result.success || !result.user) {
         setErrorMessage(result.error || 'Erro ao realizar login.');
@@ -90,14 +85,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       }
       sessionStorage.setItem('aquinos_session_active', 'true');
 
-      // Immediate callback on login success so hitting Enter logs in right away
+      // Immediate callback on login success
       onLoginSuccess(result.user);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Erro ao realizar login.');
     } finally {
       setIsLoggingIn(false);
     }
   };
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
@@ -117,15 +114,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    const res = storage.resetUserPasswordByEmail(email, password);
-    if (!res.success) {
-      setErrorMessage(res.error || 'Erro ao redefinir a senha.');
-      return;
-    }
+    setIsLoggingIn(true);
+    try {
+      const res = await storage.resetUserPasswordByEmailAsync(email, password);
+      if (!res.success) {
+        setErrorMessage(res.error || 'Erro ao redefinir a senha.');
+        return;
+      }
 
-    setSuccessMessage('Sua senha foi redefinida com sucesso! Você já pode entrar com a nova senha.');
-    setConfirmPassword('');
-    setMode('login');
+      setSuccessMessage('Sua nova senha foi salva no banco Supabase com sucesso! Você já pode entrar com ela.');
+      setConfirmPassword('');
+      setMode('login');
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Erro ao redefinir senha.');
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -540,9 +544,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           )}
         </div>
 
-        {/* Footer Version Note */}
-        <div className="p-4 text-center bg-slate-950 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-center">
-          <span>v2.5.0</span>
+        {/* Footer Security Note */}
+        <div className="p-4 text-center bg-slate-950 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Ambiente Seguro • Chronix ERP v2.5.0</span>
         </div>
       </div>
     </div>

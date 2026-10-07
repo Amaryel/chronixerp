@@ -917,6 +917,11 @@ class StorageService {
     if (!localStorage.getItem(STORAGE_KEYS.SUPPORT_TICKETS)) {
       localStorage.setItem(STORAGE_KEYS.SUPPORT_TICKETS, JSON.stringify([]));
     }
+
+    // Auto-sync with Supabase and listen for realtime changes across devices
+    setTimeout(() => {
+      this.initSupabaseSync();
+    }, 150);
   }
 
   public subscribe(listener: () => void): () => void {
@@ -1059,7 +1064,10 @@ class StorageService {
     return { success: true };
   }
 
-  // --- SUPABASE USER SYNC HELPERS ---
+  // --- SUPABASE CLOUD SYNCHRONIZATION ENGINE ---
+  private realtimeChannel: any = null;
+  private isSyncing = false;
+
   public async saveUserToSupabase(user: User): Promise<void> {
     try {
       const client = getSupabaseClient();
@@ -1092,6 +1100,423 @@ class StorageService {
     }
   }
 
+  public async saveProductToSupabase(product: Product): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const meta = {
+        unit_price: product.unit_price,
+        cost_price: product.cost_price,
+        sale_price: product.sale_price,
+        markup: product.markup,
+        box_conversion_unit: product.box_conversion_unit,
+        box_conversion_value: product.box_conversion_value,
+        allow_fractional: product.allow_fractional,
+        price_per_kg: product.price_per_kg,
+        price_per_box: product.price_per_box,
+        conversions: product.conversions || [],
+        raw_notes: product.notes || '',
+      };
+
+      const row = {
+        id: product.id,
+        name: product.name,
+        main_unit: product.main_unit || 'KG',
+        min_stock: product.min_stock || 0,
+        current_stock: product.current_stock || 0,
+        barcode: product.barcode || null,
+        category_id: product.category_id || null,
+        brand: product.brand || null,
+        notes: JSON.stringify(meta),
+        created_at: product.created_at || new Date().toISOString(),
+        updated_at: product.updated_at || new Date().toISOString(),
+      };
+
+      await client.from('produtos').upsert(row);
+    } catch (err) {
+      console.warn('Failed to save product to Supabase:', err);
+    }
+  }
+
+  public async deleteProductFromSupabase(productId: string): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('lotes').delete().eq('product_id', productId);
+      await client.from('produtos').delete().eq('id', productId);
+    } catch (err) {
+      console.warn('Failed to delete product from Supabase:', err);
+    }
+  }
+
+  public async deleteMovementFromSupabase(movementId: string): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('movimentacoes').delete().eq('id', movementId);
+    } catch (err) {
+      console.warn('Failed to delete movement from Supabase:', err);
+    }
+  }
+
+  public async saveBatchToSupabase(batch: Batch): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('lotes').upsert({
+        id: batch.id,
+        product_id: batch.product_id,
+        batch_number: batch.batch_number,
+        expiration_date: batch.expiration_date,
+        initial_qty: batch.initial_qty || batch.current_qty || 0,
+        current_qty: batch.current_qty || 0,
+        created_at: batch.created_at || new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Failed to save batch to Supabase:', err);
+    }
+  }
+
+  public async deleteBatchFromSupabase(batchId: string): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('lotes').delete().eq('id', batchId);
+    } catch (err) {
+      console.warn('Failed to delete batch from Supabase:', err);
+    }
+  }
+
+  public async saveMovementToSupabase(mov: Movement): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('movimentacoes').upsert({
+        id: mov.id,
+        date: mov.date || new Date().toISOString(),
+        user_id: mov.user_id || null,
+        user_name: mov.user_name || 'Usuário',
+        user_role: mov.user_role || 'funcionario',
+        product_id: mov.product_id,
+        product_name: mov.product_name,
+        type: mov.type,
+        used_qty: mov.used_qty,
+        used_unit: mov.used_unit,
+        converted_qty: mov.converted_qty,
+        main_unit: mov.main_unit,
+        prev_stock: mov.prev_stock,
+        current_stock: mov.current_stock,
+        supplier_id: mov.supplier_id || null,
+        supplier_name: mov.supplier_name || null,
+        unit_price: mov.unit_price || null,
+        total_price: mov.total_price || null,
+        batch_number: mov.batch_number || null,
+        expiration_date: mov.expiration_date || null,
+        origin: mov.origin || 'manual',
+        notes: mov.notes || null,
+        created_at: mov.created_at || new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Failed to save movement to Supabase:', err);
+    }
+  }
+
+  public async saveCategoryToSupabase(cat: Category): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('categorias').upsert({
+        id: cat.id,
+        name: cat.name,
+        description: cat.description || null,
+        icon: cat.icon || null,
+        created_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Failed to save category to Supabase:', err);
+    }
+  }
+
+  public async deleteCategoryFromSupabase(catId: string): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('categorias').delete().eq('id', catId);
+    } catch (err) {
+      console.warn('Failed to delete category from Supabase:', err);
+    }
+  }
+
+  public async saveSupplierToSupabase(sup: Supplier): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('fornecedores').upsert({
+        id: sup.id,
+        name: sup.name,
+        cnpj: sup.cnpj || null,
+        phone: sup.phone || null,
+        email: sup.email || null,
+        created_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Failed to save supplier to Supabase:', err);
+    }
+  }
+
+  public async deleteSupplierFromSupabase(supId: string): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('fornecedores').delete().eq('id', supId);
+    } catch (err) {
+      console.warn('Failed to delete supplier from Supabase:', err);
+    }
+  }
+
+  public async pushAllToSupabase(): Promise<{ success: boolean; counts?: any; error?: string }> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return { success: false, error: 'Supabase não conectado' };
+
+      const products = this.getProducts();
+      const batches = this.getBatches();
+      const movements = this.getMovements();
+      const suppliers = this.getSuppliers();
+      const categories = this.getCategories();
+      const users = this.getUsers();
+
+      // 1. Categories & Suppliers
+      for (const c of categories) await this.saveCategoryToSupabase(c);
+      for (const s of suppliers) await this.saveSupplierToSupabase(s);
+      for (const u of users) await this.saveUserToSupabase(u);
+
+      // 2. Products
+      for (const p of products) await this.saveProductToSupabase(p);
+
+      // 3. Batches & Movements
+      for (const b of batches) await this.saveBatchToSupabase(b);
+      for (const m of movements.slice(0, 100)) await this.saveMovementToSupabase(m);
+
+      return {
+        success: true,
+        counts: {
+          products: products.length,
+          batches: batches.length,
+          movements: movements.length,
+          suppliers: suppliers.length,
+          categories: categories.length,
+          users: users.length,
+        },
+      };
+    } catch (err: any) {
+      console.warn('Error pushing all to Supabase:', err);
+      return { success: false, error: err?.message };
+    }
+  }
+
+  public async syncAllFromSupabase(): Promise<{ success: boolean; error?: string }> {
+    if (this.isSyncing) return { success: true };
+    this.isSyncing = true;
+
+    try {
+      const client = getSupabaseClient();
+      if (!client) {
+        this.isSyncing = false;
+        return { success: false, error: 'Supabase não configurado' };
+      }
+
+      // 1. Sync Users
+      await this.syncUsersFromSupabase();
+
+      // 2. Sync Categories
+      const { data: catData } = await client.from('categorias').select('*');
+      if (catData && catData.length > 0) {
+        const remoteCats: Category[] = catData.map((row) => ({
+          id: row.id,
+          name: row.name,
+          description: row.description || undefined,
+          icon: row.icon || undefined,
+        }));
+        this.setItem(STORAGE_KEYS.CATEGORIES, remoteCats);
+      }
+
+      // 3. Sync Suppliers
+      const { data: supData } = await client.from('fornecedores').select('*');
+      if (supData && supData.length > 0) {
+        const remoteSups: Supplier[] = supData.map((row) => ({
+          id: row.id,
+          name: row.name,
+          cnpj: row.cnpj || undefined,
+          phone: row.phone || undefined,
+          email: row.email || undefined,
+        }));
+        this.setItem(STORAGE_KEYS.SUPPLIERS, remoteSups);
+      }
+
+      // 4. Sync Products
+      const { data: prodData, error: prodErr } = await client.from('produtos').select('*');
+      if (!prodErr && prodData) {
+        if (prodData.length === 0) {
+          // If remote is empty on initial setup, push local products to cloud
+          const localProducts = this.getProducts();
+          if (localProducts.length > 0) {
+            for (const p of localProducts) {
+              await this.saveProductToSupabase(p);
+            }
+          }
+        } else {
+          // Parse remote products
+          const remoteProducts: Product[] = prodData.map((row) => {
+            let meta: any = {};
+            let notesStr = row.notes;
+            if (notesStr && typeof notesStr === 'string' && (notesStr.startsWith('{') || notesStr.startsWith('['))) {
+              try {
+                meta = JSON.parse(notesStr);
+                notesStr = meta.raw_notes !== undefined ? meta.raw_notes : '';
+              } catch {
+                meta = {};
+              }
+            }
+
+            return {
+              id: row.id,
+              name: row.name,
+              main_unit: row.main_unit || 'KG',
+              min_stock: Number(row.min_stock) || 0,
+              current_stock: Number(row.current_stock) || 0,
+              barcode: row.barcode || undefined,
+              category_id: row.category_id || undefined,
+              brand: row.brand || undefined,
+              unit_price: row.unit_price !== undefined && row.unit_price !== null ? Number(row.unit_price) : (meta.unit_price !== undefined ? Number(meta.unit_price) : undefined),
+              cost_price: row.cost_price !== undefined && row.cost_price !== null ? Number(row.cost_price) : (meta.cost_price !== undefined ? Number(meta.cost_price) : undefined),
+              sale_price: row.sale_price !== undefined && row.sale_price !== null ? Number(row.sale_price) : (meta.sale_price !== undefined ? Number(meta.sale_price) : undefined),
+              markup: row.markup !== undefined && row.markup !== null ? Number(row.markup) : (meta.markup !== undefined ? Number(meta.markup) : undefined),
+              box_conversion_unit: row.box_conversion_unit || meta.box_conversion_unit || undefined,
+              box_conversion_value: row.box_conversion_value !== undefined && row.box_conversion_value !== null ? Number(row.box_conversion_value) : (meta.box_conversion_value !== undefined ? Number(meta.box_conversion_value) : undefined),
+              allow_fractional: row.allow_fractional !== undefined && row.allow_fractional !== null ? Boolean(row.allow_fractional) : (meta.allow_fractional !== undefined ? Boolean(meta.allow_fractional) : undefined),
+              price_per_kg: row.price_per_kg !== undefined && row.price_per_kg !== null ? Number(row.price_per_kg) : (meta.price_per_kg !== undefined ? Number(meta.price_per_kg) : undefined),
+              price_per_box: row.price_per_box !== undefined && row.price_per_box !== null ? Number(row.price_per_box) : (meta.price_per_box !== undefined ? Number(meta.price_per_box) : undefined),
+              conversions: meta.conversions || [],
+              notes: notesStr || undefined,
+              created_at: row.created_at || new Date().toISOString(),
+              updated_at: row.updated_at || new Date().toISOString(),
+            };
+          });
+
+          // Cloud is single source of truth - reflect deleted and edited items accurately
+          this.setItem(STORAGE_KEYS.PRODUCTS, remoteProducts);
+        }
+      }
+
+      // 5. Sync Batches
+      const { data: batchData } = await client.from('lotes').select('*');
+      if (batchData) {
+        if (batchData.length === 0) {
+          const localBatches = this.getBatches();
+          for (const b of localBatches) {
+            await this.saveBatchToSupabase(b);
+          }
+        } else {
+          const remoteBatches: Batch[] = batchData.map((row) => ({
+            id: row.id,
+            product_id: row.product_id,
+            product_name: undefined,
+            batch_number: row.batch_number,
+            expiration_date: row.expiration_date,
+            initial_qty: Number(row.initial_qty) || Number(row.current_qty) || 0,
+            current_qty: Number(row.current_qty) || 0,
+            created_at: row.created_at || new Date().toISOString(),
+          }));
+          this.setItem(STORAGE_KEYS.BATCHES, remoteBatches);
+        }
+      }
+
+      // 6. Sync Movements (latest 200)
+      const { data: movData } = await client
+        .from('movimentacoes')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(200);
+
+      if (movData && movData.length > 0) {
+        const remoteMovs: Movement[] = movData.map((row) => ({
+          id: row.id,
+          date: row.date,
+          user_id: row.user_id || undefined,
+          user_name: row.user_name || 'Usuário',
+          user_role: row.user_role || 'funcionario',
+          product_id: row.product_id,
+          product_name: row.product_name,
+          type: row.type || 'entrada',
+          used_qty: Number(row.used_qty) || 0,
+          used_unit: row.used_unit || 'KG',
+          converted_qty: Number(row.converted_qty) || 0,
+          main_unit: row.main_unit || 'KG',
+          prev_stock: Number(row.prev_stock) || 0,
+          current_stock: Number(row.current_stock) || 0,
+          supplier_id: row.supplier_id || undefined,
+          supplier_name: row.supplier_name || undefined,
+          unit_price: row.unit_price !== null ? Number(row.unit_price) : undefined,
+          total_price: row.total_price !== null ? Number(row.total_price) : undefined,
+          batch_number: row.batch_number || undefined,
+          expiration_date: row.expiration_date || undefined,
+          origin: row.origin || 'manual',
+          notes: row.notes || undefined,
+          created_at: row.created_at || new Date().toISOString(),
+        }));
+        const finalMovs = remoteMovs.sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        this.setItem(STORAGE_KEYS.MOVEMENTS, finalMovs);
+      }
+
+      this.notify();
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error in syncAllFromSupabase:', err);
+      return { success: false, error: err?.message };
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  public initSupabaseRealtime(): void {
+    try {
+      const client = getSupabaseClient();
+      if (!client || this.realtimeChannel) return;
+
+      this.realtimeChannel = client
+        .channel('aquinos_realtime_sync')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public' },
+          (payload: any) => {
+            console.log('[Supabase Realtime] Event received on table:', payload.table, payload.eventType);
+            // Debounced sync on changes from other devices
+            setTimeout(() => {
+              this.syncAllFromSupabase();
+            }, 300);
+          }
+        )
+        .subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Supabase Realtime channel connected and active.');
+          }
+        });
+    } catch (err) {
+      console.warn('Failed to init Supabase Realtime:', err);
+    }
+  }
+
+  public initSupabaseSync(): void {
+    // Initial fetch from cloud
+    this.syncAllFromSupabase().then(() => {
+      this.initSupabaseRealtime();
+    });
+  }
+
   public async syncUsersFromSupabase(): Promise<User[]> {
     try {
       const client = getSupabaseClient();
@@ -1110,12 +1535,7 @@ class StorageService {
         return local;
       }
 
-      const localUsers = this.getUsers();
-      const userMap = new Map<string, User>();
-
-      for (const u of localUsers) {
-        userMap.set(u.id, u);
-      }
+      const remoteUsers: User[] = [];
 
       for (const row of data) {
         let allowedModules: NavTab[] | undefined = undefined;
@@ -1137,38 +1557,19 @@ class StorageService {
           email: row.email,
           username: row.username || undefined,
           password: row.password || '123',
-          role: row.role || 'funcionario',
+          role: row.email.toLowerCase() === SUPERADMIN_EMAIL ? 'superadmin' : (row.role || 'funcionario'),
           company_id: row.company_id || 'comp-aquino',
-          is_approved: row.is_approved !== false,
-          is_blocked: row.is_blocked === true,
+          is_approved: row.email.toLowerCase() === SUPERADMIN_EMAIL ? true : (row.is_approved !== false),
+          is_blocked: row.email.toLowerCase() === SUPERADMIN_EMAIL ? false : (row.is_blocked === true),
           allowed_modules: allowedModules,
           created_at: row.created_at || new Date().toISOString(),
         };
 
-        const existingById = userMap.get(remoteUser.id);
-        const existingByEmail = Array.from(userMap.values()).find(
-          (u) => u.email.toLowerCase() === remoteUser.email.toLowerCase()
-        );
-
-        const target = existingById || existingByEmail;
-        if (target) {
-          const merged: User = {
-            ...target,
-            ...remoteUser,
-            allowed_modules: remoteUser.allowed_modules !== undefined ? remoteUser.allowed_modules : target.allowed_modules,
-            role: remoteUser.email.toLowerCase() === SUPERADMIN_EMAIL ? 'superadmin' : remoteUser.role,
-            is_approved: remoteUser.email.toLowerCase() === SUPERADMIN_EMAIL ? true : remoteUser.is_approved,
-            is_blocked: remoteUser.email.toLowerCase() === SUPERADMIN_EMAIL ? false : remoteUser.is_blocked,
-          };
-          userMap.set(merged.id, merged);
-        } else {
-          userMap.set(remoteUser.id, remoteUser);
-        }
+        remoteUsers.push(remoteUser);
       }
 
-      const mergedUsers = Array.from(userMap.values());
       let hasSuper = false;
-      for (const u of mergedUsers) {
+      for (const u of remoteUsers) {
         if (u.email.toLowerCase() === SUPERADMIN_EMAIL) {
           hasSuper = true;
           u.role = 'superadmin';
@@ -1177,11 +1578,11 @@ class StorageService {
         }
       }
       if (!hasSuper) {
-        mergedUsers.unshift(DEFAULT_USERS[0]);
+        remoteUsers.unshift(DEFAULT_USERS[0]);
       }
 
-      this.setItem(STORAGE_KEYS.USERS, mergedUsers);
-      return mergedUsers;
+      this.setItem(STORAGE_KEYS.USERS, remoteUsers);
+      return remoteUsers;
     } catch (err) {
       console.warn('Error in syncUsersFromSupabase:', err);
       return this.getUsers();
@@ -1232,6 +1633,25 @@ class StorageService {
     this.addAuditLog('troca_perfil', `Sessão ativa para ${user.name} (${user.role.toUpperCase()})`);
   }
 
+  public async loginAsync(identifier: string, password?: string): Promise<{ success: boolean; user?: User; error?: string }> {
+    // 1. Sync remote users directly from Supabase to ensure fresh passwords and approvals
+    try {
+      await this.syncUsersFromSupabase();
+    } catch (err) {
+      console.warn('Sync before login skipped (offline mode):', err);
+    }
+
+    // 2. Perform authentication with the fresh database state
+    const result = this.login(identifier, password);
+    if (result.success && result.user) {
+      // Trigger background sync for full catalog
+      setTimeout(() => {
+        this.syncAllFromSupabase();
+      }, 50);
+    }
+    return result;
+  }
+
   public login(identifier: string, password?: string): { success: boolean; user?: User; error?: string } {
     const cleanId = identifier.trim().toLowerCase();
     const users = this.getUsers();
@@ -1260,6 +1680,7 @@ class StorageService {
       };
       users.unshift(found);
       this.setItem(STORAGE_KEYS.USERS, users);
+      this.saveUserToSupabase(found);
     }
 
     if (!found) {
@@ -1278,6 +1699,7 @@ class StorageService {
           users[idx] = { ...found };
           this.setItem(STORAGE_KEYS.USERS, users);
         }
+        this.saveUserToSupabase(found);
       }
     } else {
       // Check if blocked
@@ -1316,6 +1738,21 @@ class StorageService {
 
     this.setCurrentUser(found);
     return { success: true, user: found };
+  }
+
+  public async resetUserPasswordByEmailAsync(email: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    const res = this.resetUserPasswordByEmail(email, newPassword);
+    if (res.success) {
+      const users = this.getUsers();
+      const cleanEmail = email.trim().toLowerCase();
+      const updated = users.find(
+        (u) => u.email.toLowerCase() === cleanEmail || (u.username && u.username.toLowerCase() === cleanEmail)
+      );
+      if (updated) {
+        await this.saveUserToSupabase(updated);
+      }
+    }
+    return res;
   }
 
   public resetUserPasswordByEmail(email: string, newPassword: string): { success: boolean; error?: string } {
@@ -1628,6 +2065,7 @@ class StorageService {
       users.push(newUser);
     }
     this.setItem(STORAGE_KEYS.USERS, users);
+    this.saveUserToSupabase(newUser);
     this.addAuditLog('edicao_produto', `Perfil do usuário atualizado: ${newUser.name} (${newUser.email})`);
   }
 
@@ -1723,6 +2161,7 @@ class StorageService {
     };
     categories.push(newCat);
     this.setItem(STORAGE_KEYS.CATEGORIES, categories);
+    this.saveCategoryToSupabase(newCat);
     this.addAuditLog('cadastro_produto', `Nova categoria cadastrada: ${name}`);
     return newCat;
   }
@@ -1739,6 +2178,7 @@ class StorageService {
     };
     suppliers.push(newSup);
     this.setItem(STORAGE_KEYS.SUPPLIERS, suppliers);
+    this.saveSupplierToSupabase(newSup);
     return newSup;
   }
 
@@ -1772,6 +2212,7 @@ class StorageService {
         };
         products[index] = updatedProduct;
         this.setItem(STORAGE_KEYS.PRODUCTS, products);
+        this.saveProductToSupabase(updatedProduct);
         this.addAuditLog('edicao_produto', `Produto editado: ${updatedProduct.name}`, updatedProduct.id);
         return updatedProduct;
       }
@@ -1798,13 +2239,14 @@ class StorageService {
 
     products.push(newProduct);
     this.setItem(STORAGE_KEYS.PRODUCTS, products);
+    this.saveProductToSupabase(newProduct);
     this.addAuditLog('cadastro_produto', `Novo produto cadastrado: ${newProduct.name}`, newProduct.id);
     return newProduct;
   }
 
   public deleteProduct(id: string): boolean {
     const user = this.getCurrentUser();
-    if (user.role !== 'admin') {
+    if (user.role !== 'admin' && user.role !== 'superadmin') {
       throw new Error('Apenas Administradores podem excluir produtos.');
     }
 
@@ -1814,6 +2256,7 @@ class StorageService {
 
     const filtered = products.filter((p) => p.id !== id);
     this.setItem(STORAGE_KEYS.PRODUCTS, filtered);
+    this.deleteProductFromSupabase(id);
     this.addAuditLog('exclusao_produto', `Produto excluído: ${prod.name}`, id);
     return true;
   }
@@ -1841,6 +2284,7 @@ class StorageService {
     products[index] = product;
 
     this.setItem(STORAGE_KEYS.PRODUCTS, products);
+    this.saveProductToSupabase(product);
     this.addAuditLog(
       'edicao_produto',
       `Conversão adicionada em ${product.name}: 1 ${newConv.from_unit} = ${newConv.factor} ${newConv.to_unit}`,
@@ -1861,6 +2305,7 @@ class StorageService {
     products[index] = product;
 
     this.setItem(STORAGE_KEYS.PRODUCTS, products);
+    this.saveProductToSupabase(product);
     return product;
   }
 
@@ -1910,6 +2355,7 @@ class StorageService {
     products[prodIndex].current_stock = currentStock;
     products[prodIndex].updated_at = new Date().toISOString();
     this.setItem(STORAGE_KEYS.PRODUCTS, products);
+    this.saveProductToSupabase(products[prodIndex]);
 
     // Create / update Lot (Batch) if specified
     if (batchNumber && expirationDate) {
@@ -1954,6 +2400,7 @@ class StorageService {
     const movements = this.getItem<Movement[]>(STORAGE_KEYS.MOVEMENTS, []);
     movements.unshift(movement);
     this.setItem(STORAGE_KEYS.MOVEMENTS, movements);
+    this.saveMovementToSupabase(movement);
 
     this.addAuditLog(
       'entrada',
@@ -2004,6 +2451,7 @@ class StorageService {
     products[prodIndex].current_stock = currentStock;
     products[prodIndex].updated_at = new Date().toISOString();
     this.setItem(STORAGE_KEYS.PRODUCTS, products);
+    this.saveProductToSupabase(products[prodIndex]);
 
     // FIFO PEPS Batch Consumption
     const consumedBatchesInfo = this.consumeBatchesFifo(productId, convertedQty);
@@ -2033,6 +2481,7 @@ class StorageService {
     const movements = this.getItem<Movement[]>(STORAGE_KEYS.MOVEMENTS, []);
     movements.unshift(movement);
     this.setItem(STORAGE_KEYS.MOVEMENTS, movements);
+    this.saveMovementToSupabase(movement);
 
     this.addAuditLog(
       'saida',
@@ -2061,6 +2510,7 @@ class StorageService {
     products[prodIndex].current_stock = countedMainQty;
     products[prodIndex].updated_at = new Date().toISOString();
     this.setItem(STORAGE_KEYS.PRODUCTS, products);
+    this.saveProductToSupabase(products[prodIndex]);
 
     const movement: Movement = {
       id: 'mov-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
@@ -2085,6 +2535,7 @@ class StorageService {
     const movements = this.getItem<Movement[]>(STORAGE_KEYS.MOVEMENTS, []);
     movements.unshift(movement);
     this.setItem(STORAGE_KEYS.MOVEMENTS, movements);
+    this.saveMovementToSupabase(movement);
 
     this.addAuditLog(
       'ajuste_manual',
@@ -2110,6 +2561,7 @@ class StorageService {
       products[prodIndex].current_stock = newStock;
       products[prodIndex].updated_at = new Date().toISOString();
       this.setItem(STORAGE_KEYS.PRODUCTS, products);
+      this.saveProductToSupabase(products[prodIndex]);
     }
 
     const user = this.getCurrentUser();
@@ -2136,6 +2588,7 @@ class StorageService {
     const movements = this.getItem<Movement[]>(STORAGE_KEYS.MOVEMENTS, []);
     movements.unshift(movement);
     this.setItem(STORAGE_KEYS.MOVEMENTS, movements);
+    this.saveMovementToSupabase(movement);
 
     this.addAuditLog(
       'ajuste_manual',
@@ -2179,10 +2632,12 @@ class StorageService {
       products[prodIndex].current_stock = newStock;
       products[prodIndex].updated_at = new Date().toISOString();
       this.setItem(STORAGE_KEYS.PRODUCTS, products);
+      this.saveProductToSupabase(products[prodIndex]);
     }
 
     movements.splice(movIndex, 1);
     this.setItem(STORAGE_KEYS.MOVEMENTS, movements);
+    this.deleteMovementFromSupabase(movementId);
 
     this.addAuditLog(
       'exclusao_movimentacao',
@@ -2530,6 +2985,7 @@ class StorageService {
   ): number {
     const products = this.getProducts();
     let count = 0;
+    const changedProducts: Product[] = [];
 
     updatedProductsList.forEach((up) => {
       const idx = products.findIndex((p) => p.id === up.id);
@@ -2542,11 +2998,13 @@ class StorageService {
           products[idx].unit_price = finalSale;
         }
         products[idx].updated_at = new Date().toISOString();
+        changedProducts.push(products[idx]);
         count++;
       }
     });
 
     this.setItem(STORAGE_KEYS.PRODUCTS, products);
+    changedProducts.forEach((p) => this.saveProductToSupabase(p));
     this.addAuditLog('alteracao_lote', `Atualização em lote de preços realizada para ${count} produto(s).`);
     return count;
   }
@@ -2561,7 +3019,7 @@ class StorageService {
     globalReason: string
   ): number {
     const user = this.getCurrentUser();
-    if (user.role !== 'admin') {
+    if (user.role !== 'admin' && user.role !== 'superadmin') {
       throw new Error('Apenas Administradores podem realizar ajustes de estoque em lote.');
     }
     if (!globalReason.trim()) {
@@ -2572,6 +3030,8 @@ class StorageService {
     const movements = this.getItem<Movement[]>(STORAGE_KEYS.MOVEMENTS, []);
     let count = 0;
     const nowISO = new Date().toISOString();
+    const changedProducts: Product[] = [];
+    const newMovements: Movement[] = [];
 
     adjustments.forEach((adj) => {
       const idx = products.findIndex((p) => p.id === adj.productId);
@@ -2608,6 +3068,8 @@ class StorageService {
           };
 
           movements.unshift(movement);
+          changedProducts.push(prod);
+          newMovements.push(movement);
           count++;
         }
       }
@@ -2615,6 +3077,9 @@ class StorageService {
 
     this.setItem(STORAGE_KEYS.PRODUCTS, products);
     this.setItem(STORAGE_KEYS.MOVEMENTS, movements);
+
+    changedProducts.forEach((p) => this.saveProductToSupabase(p));
+    newMovements.forEach((m) => this.saveMovementToSupabase(m));
 
     this.addAuditLog(
       'ajuste_manual',
@@ -2627,6 +3092,14 @@ class StorageService {
   // --- BATCHES (LOTES & VALIDADE - FIFO) ---
   public getBatches(): Batch[] {
     return this.getItem<Batch[]>(STORAGE_KEYS.BATCHES, []);
+  }
+
+  public deleteBatch(batchId: string): boolean {
+    const batches = this.getBatches();
+    const filtered = batches.filter((b) => b.id !== batchId);
+    this.setItem(STORAGE_KEYS.BATCHES, filtered);
+    this.deleteBatchFromSupabase(batchId);
+    return true;
   }
 
   public addOrUpdateBatch({
@@ -2648,6 +3121,7 @@ class StorageService {
     if (index !== -1) {
       batches[index].current_qty += addQty;
       this.setItem(STORAGE_KEYS.BATCHES, batches);
+      this.saveBatchToSupabase(batches[index]);
       return batches[index];
     }
 
@@ -2664,6 +3138,7 @@ class StorageService {
 
     batches.push(newBatch);
     this.setItem(STORAGE_KEYS.BATCHES, batches);
+    this.saveBatchToSupabase(newBatch);
     return newBatch;
   }
 
@@ -2687,6 +3162,7 @@ class StorageService {
         consumedLotNumbers.push(`${batch.batch_number} (${batch.current_qty})`);
         batch.current_qty = 0;
       }
+      this.saveBatchToSupabase(batch);
     }
 
     // Save updated batches

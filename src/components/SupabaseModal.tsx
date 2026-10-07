@@ -143,6 +143,36 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, c
     }
   };
 
+  const handleSyncAllToSupabase = async () => {
+    if (!isSuperadmin) return;
+    setSyncingUsers(true);
+    setStatusMsg(null);
+
+    try {
+      const res = await storage.pushAllToSupabase();
+      await storage.syncAllFromSupabase();
+
+      if (res.success) {
+        setStatusMsg({
+          type: 'success',
+          text: `✅ Banco Supabase 100% sincronizado em nuvem! Produtos (${res.counts?.products || 0}), Lotes (${res.counts?.batches || 0}), Usuários (${res.counts?.users || 0}) e Fornecedores (${res.counts?.suppliers || 0}) integrados.`,
+        });
+      } else {
+        setStatusMsg({
+          type: 'error',
+          text: `Erro ao sincronizar dados com Supabase: ${res.error || 'Verifique a conexão.'}`,
+        });
+      }
+    } catch (err: any) {
+      setStatusMsg({
+        type: 'error',
+        text: `Erro durante sincronização completa: ${err?.message}`,
+      });
+    } finally {
+      setSyncingUsers(false);
+    }
+  };
+
   const handleCopySql = () => {
     navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
     setCopied(true);
@@ -257,7 +287,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, c
                 />
               </div>
 
-              <div className="flex gap-2 pt-1">
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
                 <button
                   type="submit"
                   disabled={testing}
@@ -268,13 +298,13 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, c
 
                 <button
                   type="button"
-                  onClick={handleSyncUsersToSupabase}
+                  onClick={handleSyncAllToSupabase}
                   disabled={syncingUsers}
-                  className="px-3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-sm transition flex items-center gap-1.5 shrink-0"
-                  title="Sincronizar tabela de usuários do aplicativo com o Supabase"
+                  className="px-3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-sm transition flex items-center justify-center gap-1.5 shrink-0"
+                  title="Sincronizar produtos, estoque, lotes, fornecedores e usuários com o Supabase"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncingUsers ? 'animate-spin' : ''}`} />
-                  <span>Sincronizar Usuários</span>
+                  <span>Sincronizar Banco Completo (Nuvem)</span>
                 </button>
               </div>
             </form>
