@@ -68,6 +68,7 @@ interface UserManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: User;
+  initialTab?: 'overview' | 'companies' | 'users' | 'dashboards' | 'permissions';
   onRefresh?: () => void;
 }
 
@@ -267,10 +268,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   isOpen,
   onClose,
   currentUser,
+  initialTab,
   onRefresh,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'companies' | 'users' | 'dashboards'>(
-    currentUser.role === 'superadmin' ? 'overview' : 'users'
+    initialTab ? (initialTab as any) : (currentUser.role === 'superadmin' ? 'overview' : 'users')
   );
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -319,6 +321,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const [companyPwaTitle, setCompanyPwaTitle] = useState('');
   const [companySupabaseUrl, setCompanySupabaseUrl] = useState('');
   const [companySupabaseKey, setCompanySupabaseKey] = useState('');
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
+  const [isCleanDemoModalOpen, setIsCleanDemoModalOpen] = useState(false);
+  const [cleanDemoKeepCompanyId, setCleanDemoKeepCompanyId] = useState('');
 
   // Password reset inline state
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
@@ -337,10 +342,14 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadData();
+      if (initialTab) {
+        setActiveTab(initialTab as any);
+      }
       setFeedback(null);
       setUserToDelete(null);
+      setCompanyToDelete(null);
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
 
   if (!isOpen) return null;
 
@@ -674,6 +683,47 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     });
     loadData();
     onRefresh?.();
+  };
+
+  const handleDeleteCompanyClick = (comp: Company) => {
+    setCompanyToDelete(comp);
+  };
+
+  const confirmDeleteCompany = () => {
+    if (!companyToDelete) return;
+    const res = storage.deleteCompany(companyToDelete.id);
+    if (res.success) {
+      setFeedback({
+        type: 'success',
+        message: `Empresa "${companyToDelete.name}" excluída com sucesso!`,
+      });
+      setCompanyToDelete(null);
+      loadData();
+      onRefresh?.();
+    } else {
+      setFeedback({
+        type: 'error',
+        message: res.error || 'Erro ao excluir empresa.',
+      });
+    }
+  };
+
+  const handleCleanDemoCompanies = () => {
+    const res = storage.cleanDemoCompanies(cleanDemoKeepCompanyId || undefined);
+    if (res.success) {
+      setFeedback({
+        type: 'success',
+        message: `Limpeza concluída! ${res.removedCount} base(s) fictícia(s) removida(s). O sistema agora está limpo e pronto para novos clientes.`,
+      });
+      setIsCleanDemoModalOpen(false);
+      loadData();
+      onRefresh?.();
+    } else {
+      setFeedback({
+        type: 'error',
+        message: res.error || 'Erro ao limpar empresas fictícias.',
+      });
+    }
   };
 
   const currentSelectedCompanyId = storage.getSuperadminSelectedCompanyId();
@@ -1799,6 +1849,56 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         {/* TAB 3: EMPRESAS & LOGOTIPOS CNPJ */}
         {activeTab === 'companies' && (
           <div className="space-y-6">
+            {/* Top Toolbar */}
+            <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+              <div>
+                <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-cyan-400" />
+                  <span>Empresas & Bases Multi-Tenant Cadastradas</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Gerencie as empresas parceiras, personalize o logotipo para impressão/PWA e exclua bases de demonstração.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                {companies.length > 1 && (
+                  <button
+                    onClick={() => {
+                      setCleanDemoKeepCompanyId(companies[0]?.id || '');
+                      setIsCleanDemoModalOpen(true);
+                    }}
+                    className="px-3.5 py-2 bg-amber-950/70 hover:bg-amber-900 border border-amber-800/80 text-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                    title="Limpar todas as empresas de demonstração e manter apenas a do seu cliente"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Limpar Bases Demo</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setEditingCompany(null);
+                    setCompanyName('');
+                    setCompanyDoc('');
+                    setCompanyPhone('');
+                    setCompanyAddress('');
+                    setCompanyEmail('');
+                    setCompanyLogoUrl('');
+                    setCompanyThemeColor('#0284c7');
+                    setCompanyPwaTitle('');
+                    setCompanySupabaseUrl('');
+                    setCompanySupabaseKey('');
+                    setIsAddingCompany(true);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Cadastrar Nova Empresa</span>
+                </button>
+              </div>
+            </div>
+
             {/* Modal / Inline Form for Add or Edit Company */}
             {isAddingCompany && (
               <div className="p-6 bg-slate-900 border border-cyan-500/30 rounded-3xl shadow-2xl space-y-5">
@@ -2103,10 +2203,10 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                         <span>{isCurrentViewing ? 'Empresa Ativa Agora' : 'Visualizar Empresa'}</span>
                       </button>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <button
                           onClick={() => handleOpenEditCompany(c)}
-                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1 transition"
+                          className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1 transition"
                           title="Editar CNPJ, Telefone ou Logotipo"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -2115,13 +2215,22 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
                         <button
                           onClick={() => handleToggleCompanyStatus(c)}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
+                          className={`px-2.5 py-2 rounded-xl text-xs font-bold transition ${
                             c.status === 'active'
-                              ? 'bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800'
+                              ? 'bg-amber-950/80 hover:bg-amber-900 text-amber-200 border border-amber-800'
                               : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-800'
                           }`}
                         >
                           {c.status === 'active' ? 'Suspender' : 'Ativar'}
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteCompanyClick(c)}
+                          className="px-2.5 py-2 bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/80 rounded-xl text-xs font-bold flex items-center gap-1 transition shadow-sm active:scale-95"
+                          title="Excluir esta empresa permanentemente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Excluir</span>
                         </button>
                       </div>
                     </div>
@@ -2350,6 +2459,109 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Sim, Excluir Usuário</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMAÇÃO DE EXCLUSÃO DE EMPRESA */}
+      {companyToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-rose-500/50 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-3 bg-rose-500/20 border border-rose-500/40 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Excluir Empresa Permanentemente</h3>
+                <p className="text-xs text-rose-300/80">Remoção de base corporativa do sistema</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5 text-xs">
+              <p className="text-slate-200 font-bold">
+                Deseja realmente excluir a empresa <strong className="text-rose-400">{companyToDelete.name}</strong> (CNPJ: {companyToDelete.document})?
+              </p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                • Caso existam usuários vinculados a esta empresa, eles serão realocados automaticamente para a base principal ativa.<br />
+                • A exclusão será sincronizada com o banco de dados em nuvem.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setCompanyToDelete(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteCompany}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black shadow-lg shadow-rose-600/30 transition active:scale-95 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sim, Excluir Empresa</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LIMPEZA DE BASES E EMPRESAS DEMO / FICTÍCIAS */}
+      {isCleanDemoModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/50 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center gap-3 text-amber-400">
+              <div className="p-3 bg-amber-500/20 border border-amber-500/40 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Limpar Bases & Empresas Fictícias</h3>
+                <p className="text-xs text-amber-300/80">Preparar o Chronix ERP para novos clientes</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3 text-xs">
+              <p className="text-slate-300 leading-relaxed">
+                Esta ação remove todas as empresas e cadastros de teste ou demonstração criados anteriormente, mantendo apenas a empresa real selecionada abaixo:
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Selecione a Empresa Real a ser Mantida:
+                </label>
+                <select
+                  value={cleanDemoKeepCompanyId}
+                  onChange={(e) => setCleanDemoKeepCompanyId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-amber-500/40 rounded-xl text-xs text-white font-bold outline-none"
+                >
+                  {companies.map((comp) => (
+                    <option key={comp.id} value={comp.id}>
+                      {comp.name} ({comp.document || 'Sem CNPJ'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <p className="text-slate-400 text-[11px]">
+                Após a limpeza, todos os usuários ativos pertencerão à empresa selecionada e o sistema estará 100% pronto e limpo para comercialização.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setIsCleanDemoModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCleanDemoCompanies}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black shadow-lg shadow-amber-500/30 transition active:scale-95 flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>Confirmar e Limpar Bases Demo</span>
               </button>
             </div>
           </div>

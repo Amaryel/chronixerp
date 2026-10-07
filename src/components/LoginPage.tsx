@@ -62,6 +62,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       return;
     }
 
+    // Set active session in memory/sessionStorage immediately to avoid double-submit race condition
+    sessionStorage.setItem('aquinos_session_active', 'true');
+    if (rememberMe) {
+      localStorage.setItem('aquinos_remember_me', 'true');
+      localStorage.setItem('aquinos_saved_email', email.trim());
+      localStorage.setItem('aquinos_saved_password', password);
+    } else {
+      localStorage.removeItem('aquinos_remember_me');
+      localStorage.removeItem('aquinos_saved_email');
+      localStorage.removeItem('aquinos_saved_password');
+    }
+
     setIsLoggingIn(true);
 
     try {
@@ -69,25 +81,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       const result = await storage.loginAsync(email, password);
 
       if (!result.success || !result.user) {
+        sessionStorage.removeItem('aquinos_session_active');
         setErrorMessage(result.error || 'Erro ao realizar login.');
         return;
       }
 
-      // Handle Remember Me / Session persistence
-      if (rememberMe) {
-        localStorage.setItem('aquinos_remember_me', 'true');
-        localStorage.setItem('aquinos_saved_email', email.trim());
-        localStorage.setItem('aquinos_saved_password', password);
-      } else {
-        localStorage.removeItem('aquinos_remember_me');
-        localStorage.removeItem('aquinos_saved_email');
-        localStorage.removeItem('aquinos_saved_password');
-      }
-      sessionStorage.setItem('aquinos_session_active', 'true');
-
       // Immediate callback on login success
       onLoginSuccess(result.user);
     } catch (err: any) {
+      sessionStorage.removeItem('aquinos_session_active');
       setErrorMessage(err?.message || 'Erro ao realizar login.');
     } finally {
       setIsLoggingIn(false);

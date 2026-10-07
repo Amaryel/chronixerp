@@ -1008,6 +1008,7 @@ class StorageService {
         };
         companies[idx] = updatedCompany;
         this.setItem(STORAGE_KEYS.COMPANIES, companies);
+        this.saveCompanyToSupabase(updatedCompany);
         this.addAuditLog('alteracao_lote', `Empresa atualizada: ${updatedCompany.name} (CNPJ: ${updatedCompany.document})`);
         return { success: true, company: updatedCompany };
       }
@@ -1036,6 +1037,7 @@ class StorageService {
 
     companies.push(newCompany);
     this.setItem(STORAGE_KEYS.COMPANIES, companies);
+    this.saveCompanyToSupabase(newCompany);
     this.addAuditLog('cadastro_produto', `Nova empresa cadastrada: ${newCompany.name} (CNPJ/CPF: ${newCompany.document})`);
 
     return { success: true, company: newCompany };
@@ -1049,24 +1051,179 @@ class StorageService {
     const newStatus = companies[idx].status === 'active' ? 'blocked' : 'active';
     companies[idx] = { ...companies[idx], status: newStatus };
     this.setItem(STORAGE_KEYS.COMPANIES, companies);
+    this.saveCompanyToSupabase(companies[idx]);
 
     return { success: true, status: newStatus };
   }
 
   public deleteCompany(companyId: string): { success: boolean; error?: string } {
     const companies = this.getCompanies();
+    const target = companies.find((c) => c.id === companyId);
+    if (!target) return { success: false, error: 'Empresa não encontrada.' };
+
     if (companies.length <= 1) {
-      return { success: false, error: 'Não é possível excluir a única empresa cadastrada.' };
+      return {
+        success: false,
+        error: 'Não é possível excluir a única empresa cadastrada. Cadastre primeiro a empresa real do seu cliente antes de remover esta base.',
+      };
     }
 
     const filtered = companies.filter((c) => c.id !== companyId);
     this.setItem(STORAGE_KEYS.COMPANIES, filtered);
+
+    // If superadmin had this company selected as active view, reset to default
+    const selectedId = this.getSuperadminSelectedCompanyId();
+    if (selectedId === companyId) {
+      this.setSuperadminSelectedCompanyId(null);
+    }
+
+    // Reassign any users of this company to the first remaining company
+    const users = this.getUsers();
+    let usersModified = false;
+    const remainingCompanyId = filtered[0].id;
+
+    const updatedUsers = users.map((u) => {
+      if (u.company_id === companyId) {
+        usersModified = true;
+        const updated = { ...u, company_id: remainingCompanyId };
+        this.saveUserToSupabase(updated);
+        return updated;
+      }
+      return u;
+    });
+
+    if (usersModified) {
+      this.setItem(STORAGE_KEYS.USERS, updatedUsers);
+    }
+
+    // Sync deletion to Supabase
+    this.deleteCompanyFromSupabase(companyId);
+
+    this.addAuditLog(
+      'exclusao_produto',
+      `Empresa excluída pelo Superadmin: ${target.name} (CNPJ: ${target.document})`
+    );
+
     return { success: true };
+  }
+
+  /**
+   * Limpa empresas e bases fictícias/demonstração criadas anteriormente,
+   * mantendo apenas a empresa especificada (ou a empresa real do cliente).
+   */
+  public cleanDemoCompanies(targetKeepCompanyId?: string): { success: boolean; removedCount: number; error?: string } {
+    const companies = this.getCompanies();
+    if (companies.length <= 1) {
+      return { success: true, removedCount: 0 };
+    }
+
+    let keepId = targetKeepCompanyId;
+    if (!keepId) {
+      // Find a company that is not a demo default, or keep the first one
+      const realComp = companies.find((c) => c.id !== 'comp-chronix' && c.id !== 'comp-aquino');
+      keepId = realComp ? realComp.id : companies[0].id;
+    }
+
+    const toKeep = companies.filter((c) => c.id === keepId);
+    const toRemove = companies.filter((c) => c.id !== keepId);
+
+    if (toKeep.length === 0) {
+      return { success: false, removedCount: 0, error: 'Empresa selecionada para manter não foi encontrada.' };
+    }
+
+    for (const comp of toRemove) {
+      this.deleteCompanyFromSupabase(comp.id);
+    }
+
+    this.setItem(STORAGE_KEYS.COMPANIES, toKeep);
+    this.setSuperadminSelectedCompanyId(null);
+
+    // Update users
+    const users = this.getUsers().map((u) => {
+      if (u.company_id && u.company_id !== keepId) {
+        const upd = { ...u, company_id: keepId };
+        this.saveUserToSupabase(upd);
+        return upd;
+      }
+      return u;
+    });
+    this.setItem(STORAGE_KEYS.USERS, users);
+
+    this.addAuditLog(
+      'exclusao_produto',
+      `Limpeza de empresas de demonstração concluída. ${toRemove.length} base(s) fictícia(s) removida(s).`
+    );
+
+    return { success: true, removedCount: toRemove.length };
   }
 
   // --- SUPABASE CLOUD SYNCHRONIZATION ENGINE ---
   private realtimeChannel: any = null;
   private isSyncing = false;
+
+  public async saveCompanyToSupabase(company: Company): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('empresas').upsert({
+        id: company.id,
+        name: company.name,
+        document: company.document,
+        phone: company.phone || null,
+        address: company.address || null,
+        email: company.email || null,
+        logo_url: company.logo_url || null,
+        theme_color: company.theme_color || '#0284c7',
+        pwa_title: company.pwa_title || null,
+        status: company.status || 'active',
+        supabase_url: company.supabase_url || null,
+        supabase_key: company.supabase_key || null,
+        created_at: company.created_at || new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Failed to save company to Supabase (graceful):', err);
+    }
+  }
+
+  public async deleteCompanyFromSupabase(companyId: string): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('empresas').delete().eq('id', companyId);
+    } catch (err) {
+      console.warn('Failed to delete company from Supabase (graceful):', err);
+    }
+  }
+
+  public async saveCustomerToSupabase(cust: Customer): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('clientes').upsert({
+        id: cust.id,
+        name: cust.name,
+        document: cust.document || null,
+        phone: cust.phone || null,
+        address: cust.address || null,
+        email: cust.email || null,
+        credit_limit: cust.credit_limit || 0,
+        notes: cust.notes || null,
+        created_at: cust.created_at || new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Failed to save customer to Supabase (graceful):', err);
+    }
+  }
+
+  public async deleteCustomerFromSupabase(customerId: string): Promise<void> {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('clientes').delete().eq('id', customerId);
+    } catch (err) {
+      console.warn('Failed to delete customer from Supabase (graceful):', err);
+    }
+  }
 
   public async saveUserToSupabase(user: User): Promise<void> {
     try {
@@ -1596,6 +1753,9 @@ class StorageService {
 
   public getActiveSession(): User | null {
     try {
+      const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      if (!data) return null;
+
       const rememberMe = localStorage.getItem('aquinos_remember_me') === 'true';
       const sessionActive = sessionStorage.getItem('aquinos_session_active') === 'true';
 
@@ -1604,10 +1764,7 @@ class StorageService {
         return null;
       }
 
-      const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      if (!data) return null;
       const user: User = JSON.parse(data);
-
       const users = this.getUsers();
       const dbUser = users.find((u) => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
       if (dbUser && dbUser.is_blocked) {
@@ -1628,8 +1785,8 @@ class StorageService {
   }
 
   public setCurrentUser(user: User): void {
-    this.setItem(STORAGE_KEYS.CURRENT_USER, user);
     sessionStorage.setItem('aquinos_session_active', 'true');
+    this.setItem(STORAGE_KEYS.CURRENT_USER, user);
     this.addAuditLog('troca_perfil', `Sessão ativa para ${user.name} (${user.role.toUpperCase()})`);
   }
 
@@ -2659,6 +2816,7 @@ class StorageService {
       if (idx !== -1) {
         customers[idx] = { ...customers[idx], ...customerData };
         this.setItem(STORAGE_KEYS.CUSTOMERS, customers);
+        this.saveCustomerToSupabase(customers[idx]);
         return customers[idx];
       }
     }
@@ -2674,6 +2832,7 @@ class StorageService {
 
     customers.unshift(newCustomer);
     this.setItem(STORAGE_KEYS.CUSTOMERS, customers);
+    this.saveCustomerToSupabase(newCustomer);
     return newCustomer;
   }
 
@@ -2681,6 +2840,7 @@ class StorageService {
     const customers = this.getCustomers();
     const filtered = customers.filter((c) => c.id !== id);
     this.setItem(STORAGE_KEYS.CUSTOMERS, filtered);
+    this.deleteCustomerFromSupabase(id);
     return true;
   }
 

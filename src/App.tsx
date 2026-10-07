@@ -38,9 +38,6 @@ import { Building2 } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    if (localStorage.getItem('aquinos_remember_me') !== 'true') {
-      localStorage.removeItem('aquinos_current_user');
-    }
     return storage.getCurrentUser();
   });
 
@@ -164,12 +161,14 @@ export default function App() {
     return exp <= d30;
   }).length;
 
-  const activeSession = storage.getActiveSession();
+  const activeSession = currentUser || storage.getActiveSession();
 
   if (!activeSession) {
     return (
       <LoginPage
         onLoginSuccess={(user) => {
+          sessionStorage.setItem('aquinos_session_active', 'true');
+          storage.setCurrentUser(user);
           setCurrentUser(user);
           loadState();
           setActiveTab(getDefaultTabForUser(user));
@@ -178,8 +177,10 @@ export default function App() {
     );
   }
 
+  const effectiveUser = currentUser || activeSession;
+
   const isSuperadmin =
-    currentUser.email.toLowerCase() === SUPERADMIN_EMAIL || currentUser.role === 'superadmin';
+    effectiveUser.email.toLowerCase() === SUPERADMIN_EMAIL || effectiveUser.role === 'superadmin';
   const superadminCompanyOverride = storage.getSuperadminSelectedCompanyId();
 
   return (

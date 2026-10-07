@@ -369,30 +369,30 @@ export const Navigation: React.FC<NavigationProps> = ({
         </div>
       </nav>
 
-      {/* Mobile Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 border-t border-slate-200 dark:border-slate-800 backdrop-blur-md px-1.5 py-1.5 shadow-lg overflow-x-auto no-scrollbar">
-        <div className="flex items-center justify-between min-w-full gap-1">
-          {isUserAuthorizedForModule(currentUser, 'dashboard') && (
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold transition min-w-[50px] ${
-                activeTab === 'dashboard'
-                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60'
-                  : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
-              <LayoutDashboard className="w-5 h-5 mb-0.5" />
-              <span>Início</span>
-            </button>
-          )}
+      {/* Mobile Bottom Navigation Bar (5 clean items with high-touch targets) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 border-t border-slate-200 dark:border-slate-800 backdrop-blur-md px-2 py-1.5 shadow-2xl">
+        <div className="flex items-center justify-around w-full gap-1">
+          {/* 1. Início */}
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-[11px] font-extrabold transition min-h-[50px] ${
+              activeTab === 'dashboard'
+                ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/70 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <LayoutDashboard className="w-5 h-5 mb-0.5" />
+            <span>Início</span>
+          </button>
 
+          {/* 2. Produtos */}
           {isUserAuthorizedForModule(currentUser, 'products') && (
             <button
               onClick={() => setActiveTab('products')}
-              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold transition min-w-[50px] ${
+              className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-[11px] font-extrabold transition min-h-[50px] ${
                 activeTab === 'products'
-                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60'
-                  : 'text-slate-500 dark:text-slate-400'
+                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/70 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
               }`}
             >
               <Package className="w-5 h-5 mb-0.5" />
@@ -400,13 +400,14 @@ export const Navigation: React.FC<NavigationProps> = ({
             </button>
           )}
 
+          {/* 3. PDV */}
           {isUserAuthorizedForModule(currentUser, 'venda_rapida') && (
             <button
               onClick={() => setActiveTab('venda_rapida')}
-              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold transition min-w-[50px] ${
+              className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-[11px] font-black transition min-h-[50px] ${
                 activeTab === 'venda_rapida'
-                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60'
-                  : 'text-slate-500 dark:text-slate-400'
+                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/70 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
               }`}
             >
               <ShoppingCart className="w-5 h-5 mb-0.5 text-blue-500" />
@@ -414,72 +415,41 @@ export const Navigation: React.FC<NavigationProps> = ({
             </button>
           )}
 
-          {isUserAuthorizedForModule(currentUser, 'exits') && (
-            <button
-              onClick={() => setActiveTab('exits')}
-              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold transition min-w-[50px] ${
-                activeTab === 'exits'
-                  ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60'
-                  : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
-              <ArrowUpRight className="w-5 h-5 mb-0.5 text-rose-500" />
-              <span>Pré-Venda</span>
-            </button>
-          )}
-
-          {isUserAuthorizedForModule(currentUser, 'carga_vendedor') && (
+          {/* 4. Rota de Vendas ou Movimentação */}
+          {isUserAuthorizedForModule(currentUser, 'carga_vendedor') ? (
             <button
               onClick={() => setActiveTab('carga_vendedor')}
-              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold transition min-w-[50px] ${
+              className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-[11px] font-extrabold transition min-h-[50px] ${
                 activeTab === 'carga_vendedor'
-                  ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60'
-                  : 'text-slate-500 dark:text-slate-400'
+                  ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/70 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
               }`}
             >
               <Truck className="w-5 h-5 mb-0.5 text-emerald-500" />
               <span>Rota</span>
             </button>
-          )}
-
-          {isUserAuthorizedForModule(currentUser, 'fiados') && (
+          ) : isUserAuthorizedForModule(currentUser, 'exits') ? (
             <button
-              onClick={() => setActiveTab('fiados')}
-              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold transition min-w-[50px] ${
-                activeTab === 'fiados'
-                  ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60'
-                  : 'text-slate-500 dark:text-slate-400'
+              onClick={() => setActiveTab('exits')}
+              className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-[11px] font-extrabold transition min-h-[50px] ${
+                activeTab === 'exits'
+                  ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/70 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
               }`}
             >
-              <BookOpenCheck className="w-5 h-5 mb-0.5 text-amber-500" />
-              <span>Contas</span>
+              <ArrowUpRight className="w-5 h-5 mb-0.5 text-rose-500" />
+              <span>Pré-Venda</span>
             </button>
-          )}
+          ) : null}
 
-          {isUserAuthorizedForModule(currentUser, 'reports') && (
-            <button
-              onClick={() => setActiveTab('reports')}
-              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold transition min-w-[50px] ${
-                activeTab === 'reports'
-                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60'
-                  : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
-              <FileSpreadsheet className="w-5 h-5 mb-0.5 text-indigo-500" />
-              <span>Relatórios</span>
-            </button>
-          )}
-
-          {/* Menu Lateral Hamburger Drawer Button */}
-          {onOpenSidebar && (
-            <button
-              onClick={onOpenSidebar}
-              className="flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-black transition min-w-[50px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60"
-            >
-              <Menu className="w-5 h-5 mb-0.5 text-blue-600 dark:text-blue-400" />
-              <span>Menu</span>
-            </button>
-          )}
+          {/* 5. Menu Completo (Abre Drawer com todos os módulos, Configurações e Ferramentas) */}
+          <button
+            onClick={onOpenSidebar}
+            className="flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-[11px] font-black transition min-h-[50px] text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/80 border border-blue-200/50 dark:border-blue-800/40 active:scale-95"
+          >
+            <Menu className="w-5 h-5 mb-0.5 text-blue-600 dark:text-blue-400" />
+            <span>Menu</span>
+          </button>
         </div>
       </nav>
     </>

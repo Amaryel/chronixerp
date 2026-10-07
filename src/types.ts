@@ -120,6 +120,8 @@ export interface Customer {
   document?: string; // CPF ou CNPJ
   cpf_cnpj?: string; // CPF ou CNPJ alias
   phone?: string;
+  address?: string;
+  email?: string;
   credit_limit?: number;
   total_debt?: number;
   notes?: string;
